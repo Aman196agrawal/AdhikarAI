@@ -336,10 +336,16 @@ export async function auditBenefit(input: {
     expectedAmount: paise(p.expectedAmountPaise),
   }));
 
-  // Materialise the schedule the first time a benefit is actually approved.
-  // Doing it at discovery would invent due dates for money never owed.
+  // Materialise the expected schedule, and EXTEND it as time passes.
+  //
+  // It is created only once a benefit is actually approved - doing it at
+  // discovery would invent due dates for money never owed. But it must also
+  // grow: a schedule generated in January reached only to January, so by April
+  // the February and March instalments would not exist to be missed, and a
+  // pension that stopped would look perfectly healthy. Topping up on every
+  // audit is what makes the continuity check work over time rather than only
+  // at the moment of approval.
   if (
-    expectedSchedule.length === 0 &&
     applicationStatus === "APPROVED" &&
     expectedPerInstalment !== null &&
     govStatus?.decidedOn
@@ -351,9 +357,12 @@ export async function auditBenefit(input: {
       amount: expectedPerInstalment,
     });
 
-    if (generated.length > 0) {
+    const known = new Set(expectedSchedule.map((p) => p.periodLabel));
+    const added = generated.filter((item) => !known.has(item.periodLabel));
+
+    if (added.length > 0) {
       await prisma.expectedPayment.createMany({
-        data: generated.map((item) => ({
+        data: added.map((item) => ({
           entitlementId: entitlement.id,
           periodLabel: item.periodLabel,
           dueOn: item.dueOn,
@@ -361,7 +370,7 @@ export async function auditBenefit(input: {
         })),
         skipDuplicates: true,
       });
-      expectedSchedule = generated;
+      expectedSchedule = [...expectedSchedule, ...added];
     }
   }
 
