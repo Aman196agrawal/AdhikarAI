@@ -16,11 +16,14 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
+import { translator, type Locale } from "@/lib/i18n";
 import { buttonClass } from "./ui";
 
 interface Props {
   citizenId: string;
   paymentId: string;
+  /** The locale, not a translator: functions cannot cross the RSC boundary. */
+  locale: Locale;
 }
 
 interface Outcome {
@@ -30,7 +33,8 @@ interface Outcome {
   refLast4?: string | null;
 }
 
-export function BankEvidenceUpload({ citizenId, paymentId }: Props) {
+export function BankEvidenceUpload({ citizenId, paymentId, locale }: Props) {
+  const t = translator(locale);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [busy, setBusy] = useState(false);
@@ -85,12 +89,9 @@ export function BankEvidenceUpload({ citizenId, paymentId }: Props) {
 
   return (
     <div className="mt-4 rounded-[var(--radius-card)] border bg-surface p-4">
-      <h3 className="font-semibold">Shall we check your bank record?</h3>
+      <h3 className="font-semibold">{t("bank.heading")}</h3>
 
-      <p className="mt-1 text-sm text-muted">
-        If you have a photo of your passbook page, or a bank statement, we can
-        look for this one payment.
-      </p>
+      <p className="mt-1 text-sm text-muted">{t("bank.intro")}</p>
 
       {/* Stated before the file picker, not after. */}
       <ul className="mt-3 space-y-1 text-sm text-muted">
@@ -98,28 +99,25 @@ export function BankEvidenceUpload({ citizenId, paymentId }: Props) {
           <span aria-hidden="true" className="text-[var(--ok)]">
             ✓
           </span>
-          We look for one payment, of the amount due, around the date it was
-          sent.
+          {t("bank.keep1")}
         </li>
         <li className="flex gap-2">
           <span aria-hidden="true" className="text-[var(--ok)]">
             ✓
           </span>
-          We keep four things: the amount found, its date, the last four
-          characters of its reference, and a fingerprint of the file.
+          {t("bank.keep2")}
         </li>
         <li className="flex gap-2">
           <span aria-hidden="true" className="text-[var(--bad)]">
             ✕
           </span>
-          We do not keep the document, your balance, your account number, or any
-          other transaction on the page.
+          {t("bank.keep3")}
         </li>
       </ul>
 
       <div className="mt-4">
         <label className={`${buttonClass.secondary} cursor-pointer`}>
-          {busy ? "Checking…" : "Choose a file"}
+          {busy ? t("bank.checking") : t("bank.choose")}
           <input
             ref={inputRef}
             type="file"
@@ -132,9 +130,7 @@ export function BankEvidenceUpload({ citizenId, paymentId }: Props) {
             }}
           />
         </label>
-        <p className="mt-2 text-xs text-subtle">
-          PDF or photo, up to 12 MB. One page showing the payment is enough.
-        </p>
+        <p className="mt-2 text-xs text-subtle">{t("bank.limits")}</p>
       </div>
 
       {outcome ? (

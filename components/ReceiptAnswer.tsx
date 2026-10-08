@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { BankEvidenceUpload } from "./BankEvidenceUpload";
+import { translator, type Locale } from "@/lib/i18n";
 import { buttonClass } from "./ui";
 
 type Answer = "YES" | "NO" | "NOT_SURE";
@@ -27,6 +28,14 @@ interface Props {
   schemeName: string;
   periodLabel: string;
   amountLabel: string;
+  /**
+   * The LOCALE, not a bound translator.
+   *
+   * A function cannot cross the server/client boundary - React refuses to
+   * serialise it - so the component builds its own translator from a plain
+   * string. The dictionary is small and pure, so shipping it is cheap.
+   */
+  locale: Locale;
 }
 
 export function ReceiptAnswer({
@@ -35,7 +44,9 @@ export function ReceiptAnswer({
   schemeName,
   periodLabel,
   amountLabel,
+  locale,
 }: Props) {
+  const t = translator(locale);
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [submitting, setSubmitting] = useState<Answer | null>(null);
@@ -81,10 +92,14 @@ export function ReceiptAnswer({
   if (result) {
     return (
       <div className="rounded-[var(--radius-card)] border bg-surface-sunken p-4">
-        <p className="font-medium">Thank you. We have recorded that.</p>
+        <p className="font-medium">{t("receipt.recorded")}</p>
         <p className="mt-1 text-sm text-muted">{result.nextStep}</p>
         {result.offerBankVerification ? (
-          <BankEvidenceUpload citizenId={citizenId} paymentId={paymentId} />
+          <BankEvidenceUpload
+            citizenId={citizenId}
+            paymentId={paymentId}
+            locale={locale}
+          />
         ) : null}
       </div>
     );
@@ -96,7 +111,7 @@ export function ReceiptAnswer({
         The government says {amountLabel} was sent to you for {schemeName} (
         {periodLabel}).
       </p>
-      <p className="mt-1 text-xl font-semibold">Did you receive this money?</p>
+      <p className="mt-1 text-xl font-semibold">{t("receipt.question")}</p>
 
       <div className="mt-4 flex flex-wrap gap-3">
         <button
@@ -105,7 +120,7 @@ export function ReceiptAnswer({
           disabled={submitting !== null || pending}
           className={`${buttonClass.answer} border-[var(--ok-border)] text-[var(--ok)]`}
         >
-          {submitting === "YES" ? "Saving…" : "Yes"}
+          {submitting === "YES" ? t("receipt.saving") : t("receipt.yes")}
         </button>
         <button
           type="button"
@@ -113,7 +128,7 @@ export function ReceiptAnswer({
           disabled={submitting !== null || pending}
           className={`${buttonClass.answer} border-[var(--bad-border)] text-[var(--bad)]`}
         >
-          {submitting === "NO" ? "Saving…" : "No"}
+          {submitting === "NO" ? t("receipt.saving") : t("receipt.no")}
         </button>
         <button
           type="button"
@@ -121,13 +136,11 @@ export function ReceiptAnswer({
           disabled={submitting !== null || pending}
           className={`${buttonClass.answer} border-[var(--warn-border)] text-[var(--warn)]`}
         >
-          {submitting === "NOT_SURE" ? "Saving…" : "Not sure"}
+          {submitting === "NOT_SURE" ? t("receipt.saving") : t("receipt.notSure")}
         </button>
       </div>
 
-      <p className="mt-3 text-sm text-subtle">
-        &ldquo;Not sure&rdquo; is a perfectly good answer. We will help you check.
-      </p>
+      <p className="mt-3 text-sm text-subtle">{t("receipt.notSureIsFine")}</p>
 
       {error ? (
         <p

@@ -16,9 +16,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { deserialize, formatINR } from "@/lib/engine/money";
+import { translator } from "@/lib/i18n";
+import { resolveLocale } from "@/lib/locale";
 import { buildDashboard, type BenefitCard } from "@/lib/services/dashboard";
 import { currentClock } from "@/lib/services/clock";
 import { requireSelectedCitizen } from "@/lib/session";
+import { LocaleToggle } from "@/components/LocaleToggle";
 import { ReceiptAnswer } from "@/components/ReceiptAnswer";
 import {
   Card,
@@ -176,6 +179,8 @@ function BenefitRow({ benefit }: { benefit: BenefitCard }) {
 
 export default async function DashboardPage() {
   const citizen = await requireSelectedCitizen();
+  const locale = await resolveLocale(citizen.locale);
+  const t = translator(locale);
   const clock = await currentClock();
   const data = await buildDashboard({ citizenId: citizen.citizenId, clock });
 
@@ -212,8 +217,9 @@ export default async function DashboardPage() {
               Demo clock: {data.clock.now.slice(0, 10)}
             </StatusPill>
           ) : null}
+          <LocaleToggle locale={locale} />
           <Link href="/" className={buttonClass.secondary}>
-            Switch person
+            {t("app.switchPerson")}
           </Link>
         </div>
       </header>
@@ -221,8 +227,8 @@ export default async function DashboardPage() {
       {/* ------------------------------------------------- waiting on you */}
       {receiptActions.length > 0 ? (
         <section className="mt-8">
-          <SectionHeading hint="One question, and it only takes a moment.">
-            We need to ask you something
+          <SectionHeading hint={t("actions.askHint")}>
+            {t("actions.askHeading")}
           </SectionHeading>
           <ul className="space-y-3">
             {receiptActions.map((action) => (
@@ -237,6 +243,7 @@ export default async function DashboardPage() {
                       ? formatINR(deserialize(action.amountPaise))
                       : "a payment"
                   }
+                  locale={locale}
                 />
               </Card>
             ))}
@@ -246,8 +253,8 @@ export default async function DashboardPage() {
 
       {approvalActions.length > 0 ? (
         <section className="mt-8">
-          <SectionHeading hint="Nothing is sent or filed on your behalf until you say so.">
-            Waiting for your approval
+          <SectionHeading hint={t("actions.approvalHint")}>
+            {t("actions.approvalHeading")}
           </SectionHeading>
           <ul className="space-y-3">
             {approvalActions.map((action) => (
@@ -257,7 +264,7 @@ export default async function DashboardPage() {
                   href={`/approve/${action.approvalId}`}
                   className={`${buttonClass.primary} mt-3`}
                 >
-                  Review it
+                  {t("actions.review")}
                   <span aria-hidden="true">→</span>
                 </Link>
               </Card>
@@ -268,32 +275,32 @@ export default async function DashboardPage() {
 
       {/* ----------------------------------------------------- the totals */}
       <section className="mt-8">
-        <SectionHeading hint="These four figures are kept apart on purpose. They are not the same kind of claim.">
-          Your money
+        <SectionHeading hint={t("money.headingHint")}>
+          {t("money.heading")}
         </SectionHeading>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           <StatTile
-            label="Received"
+            label={t("money.received")}
             paise={data.totals.receivedPaise}
-            hedge="Confirmed by you or proven by evidence"
+            hedge={t("money.receivedHedge")}
             tone="ok"
           />
           <StatTile
-            label="Not yet confirmed"
+            label={t("money.unverified")}
             paise={data.totals.unverifiedPaise}
-            hedge="Reported as sent. Not missing — unconfirmed."
+            hedge={t("money.unverifiedHedge")}
             tone="warn"
           />
           <StatTile
-            label="Did not arrive"
+            label={t("money.missing")}
             paise={data.totals.provenMissingPaise}
-            hedge="Proven absent, with evidence"
+            hedge={t("money.missingHedge")}
             tone="bad"
           />
           <StatTile
-            label="You may be entitled to"
+            label={t("money.potential")}
             paise={data.totals.potentialAnnualPaise}
-            hedge="A yearly estimate for benefits not yet claimed"
+            hedge={t("money.potentialHedge")}
           />
         </div>
 
@@ -311,8 +318,8 @@ export default async function DashboardPage() {
       <section className="mt-10 space-y-8">
         {groups.actionRequired.length > 0 ? (
           <div>
-            <SectionHeading hint="Something has gone wrong and we can do something about it.">
-              Needs action ({groups.actionRequired.length})
+            <SectionHeading hint={t("group.needsActionHint")}>
+              {t("group.needsAction")} ({groups.actionRequired.length})
             </SectionHeading>
             <ul className="space-y-3">
               {groups.actionRequired.map((b) => (
@@ -324,8 +331,8 @@ export default async function DashboardPage() {
 
         {groups.needsVerification.length > 0 ? (
           <div>
-            <SectionHeading hint="We cannot yet confirm these reached you. That is not the same as them being lost.">
-              Needs checking ({groups.needsVerification.length})
+            <SectionHeading hint={t("group.needsCheckingHint")}>
+              {t("group.needsChecking")} ({groups.needsVerification.length})
             </SectionHeading>
             <ul className="space-y-3">
               {groups.needsVerification.map((b) => (
@@ -337,8 +344,8 @@ export default async function DashboardPage() {
 
         {otherActions.length > 0 ? (
           <div>
-            <SectionHeading hint="You appear to qualify but have not claimed these.">
-              Not yet claimed ({otherActions.length})
+            <SectionHeading hint={t("group.notClaimedHint")}>
+              {t("group.notClaimed")} ({otherActions.length})
             </SectionHeading>
             <ul className="space-y-3">
               {otherActions.map((action) => (
@@ -369,8 +376,8 @@ export default async function DashboardPage() {
 
         {groups.healthy.length > 0 ? (
           <div>
-            <SectionHeading hint="Arriving as they should. We keep watching anyway.">
-              All in order ({groups.healthy.length})
+            <SectionHeading hint={t("group.allInOrderHint")}>
+              {t("group.allInOrder")} ({groups.healthy.length})
             </SectionHeading>
             <ul className="space-y-3">
               {groups.healthy.map((b) => (
@@ -401,8 +408,8 @@ export default async function DashboardPage() {
               how they can tell the system looked properly, and how they can
               correct it if it is wrong about them.
             */}
-            <SectionHeading hint="These do not apply to you. We show them so you can see we checked, and why.">
-              Does not apply ({groups.excluded.length})
+            <SectionHeading hint={t("group.doesNotApplyHint")}>
+              {t("group.doesNotApply")} ({groups.excluded.length})
             </SectionHeading>
             <ul className="space-y-2">
               {groups.excluded.map((b) => (

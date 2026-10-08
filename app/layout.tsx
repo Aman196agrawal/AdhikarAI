@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 
+import { translator } from "@/lib/i18n";
+import { resolveLocale } from "@/lib/locale";
+
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -8,11 +11,14 @@ export const metadata: Metadata = {
     "Finding your benefits is not enough. AdhikarAI makes sure you receive them.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await resolveLocale();
+  const t = translator(locale);
+
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body className="min-h-dvh">
         {/*
           A prototype notice, shown on every screen.
@@ -24,8 +30,7 @@ export default function RootLayout({
         */}
         <div className="border-b bg-[var(--demo-soft)] px-4 py-2 text-center text-sm text-[var(--demo)]">
           <span aria-hidden="true">▲ </span>
-          Prototype. Government application and payment data shown here is
-          simulated, not live.
+          {t("app.prototypeNotice")}
         </div>
         {children}
       </body>

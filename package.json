@@ -22,7 +22,8 @@
     "test:boundaries": "vitest run tests/boundaries",
     "seed:demo": "tsx prisma/seed-demo.ts",
     "seed:all": "npm run seed && npm run seed:demo",
-    "db:test": "node scripts/test-db.mjs"
+    "db:test": "node scripts/test-db.mjs",
+    "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

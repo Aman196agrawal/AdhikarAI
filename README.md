@@ -59,8 +59,16 @@ the real model.
 
 ```bash
 npm run db:test        # creates and migrates a SEPARATE test database
-npm test               # 376 tests
+npm test               # 398 tests
+npm run smoke          # load every page against a running server
 ```
+
+`npm run smoke` exists because of a real miss. Passing a function across the
+Server/Client Component boundary is invalid in React, and it made the dashboard
+return 500 — while typecheck was clean, `next build` succeeded, and every test
+passed. None of those execute a page render. The smoke check is the floor
+beneath the test suite: start the server, load every route in both languages,
+assert a 200 and that the expected content is actually there.
 
 The scenario tests clear citizen data between cases, so they use their own
 database. Without that, running the suite would delete your demo personas —
