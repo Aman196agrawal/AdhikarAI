@@ -1,26 +1,244 @@
 @import "tailwindcss";
 
+/*
+ * AdhikarAI design tokens.
+ *
+ * The people this is for are often elderly, often reading on a cheap phone in
+ * bright sunlight, and often not confident with digital systems. So: large
+ * type, generous spacing, high contrast, and status never conveyed by colour
+ * alone - every state carries a word and an icon as well.
+ *
+ * The five status colours map to the five receipt states, which is the one
+ * distinction the whole product rests on. "Unverified" is deliberately amber
+ * and NOT red: it means "we cannot confirm this reached you", not "this money
+ * is gone", and colouring it as an error would tell the citizen something
+ * untrue.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #fbfaf8;
+  --surface: #ffffff;
+  --surface-sunken: #f4f2ee;
+  --border: #e3dfd8;
+  --border-strong: #cdc7bd;
+
+  --foreground: #1c1a17;
+  --muted: #5e5952;
+  --subtle: #8a847a;
+
+  /* Brand: a warm indigo, calm rather than institutional. */
+  --accent: #3f3d9e;
+  --accent-hover: #332f86;
+  --accent-soft: #ecebfa;
+  --accent-ring: #8e8ad8;
+
+  /* Verified: proven to have arrived. */
+  --ok: #1d6b4a;
+  --ok-soft: #e4f3ec;
+  --ok-border: #a8d6c0;
+
+  /* Citizen-confirmed: their word, not independent proof. */
+  --info: #1d5a8a;
+  --info-soft: #e5f0f8;
+  --info-border: #a7cbe4;
+
+  /* Unverified: released, unconfirmed. NOT an error. */
+  --warn: #8a5a09;
+  --warn-soft: #fcf1dc;
+  --warn-border: #e8cf9d;
+
+  /* Discrepancy: proven absent. */
+  --bad: #9d2222;
+  --bad-soft: #fbeaea;
+  --bad-border: #eab6b6;
+
+  /* Excluded: not applicable. Grey, because it is not a failure. */
+  --neutral: #5e5952;
+  --neutral-soft: #f0eeea;
+  --neutral-border: #d8d3ca;
+
+  /* Demo data marker. Deliberately conspicuous. */
+  --demo: #6b3fa0;
+  --demo-soft: #f3ecfb;
+  --demo-border: #d4bdf0;
+
+  --radius: 0.75rem;
+  --radius-lg: 1.125rem;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --background: #141311;
+    --surface: #1d1b19;
+    --surface-sunken: #262320;
+    --border: #332f2b;
+    --border-strong: #46413b;
+
+    --foreground: #f3f0eb;
+    --muted: #b4ada3;
+    --subtle: #8a847a;
+
+    --accent: #a9a6f0;
+    --accent-hover: #bcb9f5;
+    --accent-soft: #24224a;
+    --accent-ring: #6f6bc4;
+
+    --ok: #74d3a8;
+    --ok-soft: #14301f;
+    --ok-border: #2c6446;
+
+    --info: #8cc4ea;
+    --info-soft: #132a3d;
+    --info-border: #2b5a7f;
+
+    --warn: #e8bd6d;
+    --warn-soft: #35270f;
+    --warn-border: #6d5422;
+
+    --bad: #f0a0a0;
+    --bad-soft: #351717;
+    --bad-border: #70302f;
+
+    --neutral: #b4ada3;
+    --neutral-soft: #262320;
+    --neutral-border: #403b35;
+
+    --demo: #c9a8ef;
+    --demo-soft: #251a35;
+    --demo-border: #4e3a6e;
+  }
+}
+
+:root[data-theme="dark"] {
+  --background: #141311;
+  --surface: #1d1b19;
+  --surface-sunken: #262320;
+  --border: #332f2b;
+  --border-strong: #46413b;
+
+  --foreground: #f3f0eb;
+  --muted: #b4ada3;
+  --subtle: #8a847a;
+
+  --accent: #a9a6f0;
+  --accent-hover: #bcb9f5;
+  --accent-soft: #24224a;
+  --accent-ring: #6f6bc4;
+
+  --ok: #74d3a8;
+  --ok-soft: #14301f;
+  --ok-border: #2c6446;
+
+  --info: #8cc4ea;
+  --info-soft: #132a3d;
+  --info-border: #2b5a7f;
+
+  --warn: #e8bd6d;
+  --warn-soft: #35270f;
+  --warn-border: #6d5422;
+
+  --bad: #f0a0a0;
+  --bad-soft: #351717;
+  --bad-border: #70302f;
+
+  --neutral: #b4ada3;
+  --neutral-soft: #262320;
+  --neutral-border: #403b35;
+
+  --demo: #c9a8ef;
+  --demo-soft: #251a35;
+  --demo-border: #4e3a6e;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-border-subtle: var(--border);
+  --color-border-strong: var(--border-strong);
+
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-ok-border: var(--ok-border);
+
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-info-border: var(--info-border);
+
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-warn-border: var(--warn-border);
+
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-bad-border: var(--bad-border);
+
+  --color-neutral: var(--neutral);
+  --color-neutral-soft: var(--neutral-soft);
+  --color-neutral-border: var(--neutral-border);
+
+  --color-demo: var(--demo);
+  --color-demo-soft: var(--demo-soft);
+  --color-demo-border: var(--demo-border);
+
+  --radius-card: var(--radius);
+  --radius-panel: var(--radius-lg);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  border-color: var(--border);
+}
+
+html {
+  /* Slightly larger base: this audience benefits from it more than the
+     layout suffers. */
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Noto Sans",
+    "Noto Sans Devanagari", sans-serif;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tabular figures everywhere money appears, so columns of amounts line up. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Visible focus for keyboard and switch-access users. Never removed. */
+:where(a, button, summary, input, select, textarea):focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+summary {
+  cursor: pointer;
+  list-style: none;
+}
+summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

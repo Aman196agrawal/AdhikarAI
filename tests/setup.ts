@@ -9,6 +9,17 @@
 
 import "dotenv/config";
 
+/**
+ * Point the suite at the TEST database before anything opens a connection.
+ *
+ * The scenario tests clear citizen data between cases. Without this they would
+ * wipe the demo personas on every run, which is a bad thing to discover on a
+ * demo day. Run `npm run db:test` once to migrate this schema.
+ */
+if (process.env.TEST_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
+}
+
 process.env.LLM_PROVIDER = "stub";
 
 // Demo-mode features are off unless a test opts in, so a test cannot

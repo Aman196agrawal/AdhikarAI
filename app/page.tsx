@@ -1,69 +1,201 @@
-import Image from "next/image";
+/**
+ * The persona selector: the demo's front door.
+ *
+ * Stands in for a login. Choosing a persona sets a cookie and goes to the
+ * dashboard. See lib/session.ts for why this is confined to one place.
+ */
 
-export default function Home() {
+import Link from "next/link";
+import { redirect } from "next/navigation";
+
+import { prisma } from "@/lib/db";
+import { isDemoMode } from "@/lib/authz";
+import { CITIZEN_COOKIE } from "@/lib/session";
+import { Card, EmptyState, Money, buttonClass } from "@/components/ui";
+
+export const dynamic = "force-dynamic";
+
+async function choosePersona(formData: FormData): Promise<void> {
+  "use server";
+
+  const { cookies } = await import("next/headers");
+  const citizenId = String(formData.get("citizenId") ?? "");
+  if (citizenId === "") return;
+
+  const store = await cookies();
+  store.set(CITIZEN_COOKIE, citizenId, {
+    httpOnly: true,
+    sameSite: "lax",
+    path: "/",
+    maxAge: 60 * 60 * 12,
+  });
+
+  redirect("/dashboard");
+}
+
+export default async function HomePage() {
+  const demoMode = isDemoMode();
+
+  const personas = await prisma.demoPersona.findMany({
+    where: { citizenId: { not: null } },
+    orderBy: { position: "asc" },
+    include: {
+      citizen: {
+        select: { nameHi: true, locale: true },
+      },
+    },
+  });
+
+  // Headline figures per persona, so the chooser previews what each one shows.
+  const summaries = new Map<
+    string,
+    { received: bigint; unverified: bigint; missing: bigint; open: number }
+  >();
+
+  for (const persona of personas) {
+    if (!persona.citizenId) continue;
+    const ledgers = await prisma.benefitLedger.findMany({
+      where: { entitlement: { citizenId: persona.citizenId } },
+    });
+    const open = await prisma.benefitGap.count({
+      where: { entitlement: { citizenId: persona.citizenId }, resolvedAt: null },
+    });
+    summaries.set(persona.citizenId, {
+      received: ledgers.reduce((n, l) => n + l.receivedAmountPaise, 0n),
+      unverified: ledgers.reduce((n, l) => n + l.unverifiedAmountPaise, 0n),
+      missing: ledgers.reduce((n, l) => n + l.gapAmountPaise, 0n),
+      open,
+    });
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="mx-auto max-w-3xl px-4 py-10 sm:py-14">
+      <header>
+        <p className="text-sm font-semibold uppercase tracking-wider text-accent">
+          AdhikarAI
+        </p>
+        <h1 className="mt-2 text-balance text-3xl font-bold leading-tight sm:text-4xl">
+          Finding your benefits isn&rsquo;t enough.
+        </h1>
+        <p className="mt-1 text-balance text-2xl font-semibold text-muted sm:text-3xl">
+          We make sure you receive them.
+        </p>
+        <p className="mt-5 max-w-2xl text-muted">
+          Most systems stop once they have told you which schemes you qualify
+          for. This one keeps going: it checks what the government actually did,
+          asks whether the money reached you, works out why when it didn&rsquo;t,
+          and keeps watching afterwards.
+        </p>
+      </header>
+
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold">Choose someone to follow</h2>
+        <p className="mt-0.5 text-sm text-muted">
+          There is no sign-in in this prototype. Pick a person to see their
+          benefits.
+        </p>
+
+        {personas.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState>
+              No demo people have been set up yet. Run{" "}
+              <code className="rounded bg-surface-sunken px-1.5 py-0.5 text-sm">
+                npm run seed:all
+              </code>{" "}
+              to create them.
+              {!demoMode ? (
+                <>
+                  <br />
+                  <span className="mt-2 inline-block">
+                    Demo mode is also off. Set{" "}
+                    <code className="rounded bg-surface-sunken px-1.5 py-0.5 text-sm">
+                      DEMO_MODE=true
+                    </code>
+                    .
+                  </span>
+                </>
+              ) : null}
+            </EmptyState>
+          </div>
+        ) : (
+          <ul className="mt-4 space-y-3">
+            {personas.map((persona) => {
+              const summary = persona.citizenId
+                ? summaries.get(persona.citizenId)
+                : undefined;
+
+              return (
+                <Card as="li" key={persona.id} className="sm:flex sm:items-center sm:gap-5">
+                  <div className="min-w-0 flex-1">
+                    <h3 className="text-lg font-semibold">
+                      {persona.label}
+                      {persona.citizen?.nameHi ? (
+                        <span className="ml-2 text-base font-normal text-subtle">
+                          {persona.citizen.nameHi}
+                        </span>
+                      ) : null}
+                    </h3>
+                    <p className="mt-0.5 text-sm text-muted">{persona.description}</p>
+
+                    {summary ? (
+                      <dl className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm">
+                        <div>
+                          <dt className="inline text-subtle">Received </dt>
+                          <dd className="inline font-semibold tabular text-[var(--ok)]">
+                            <Money paise={summary.received.toString()} />
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="inline text-subtle">Unconfirmed </dt>
+                          <dd className="inline font-semibold tabular text-[var(--warn)]">
+                            <Money paise={summary.unverified.toString()} />
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="inline text-subtle">Did not arrive </dt>
+                          <dd className="inline font-semibold tabular text-[var(--bad)]">
+                            <Money paise={summary.missing.toString()} />
+                          </dd>
+                        </div>
+                      </dl>
+                    ) : null}
+                  </div>
+
+                  <form action={choosePersona} className="mt-4 shrink-0 sm:mt-0">
+                    <input type="hidden" name="citizenId" value={persona.citizenId ?? ""} />
+                    <button type="submit" className={buttonClass.primary}>
+                      Open
+                      <span aria-hidden="true">→</span>
+                    </button>
+                  </form>
+                </Card>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+
+      <section className="mt-10 rounded-[var(--radius-panel)] border bg-surface-sunken p-5">
+        <h2 className="font-semibold">The distinction this is built around</h2>
+        <p className="mt-2 text-sm leading-relaxed text-muted">
+          Four different things are tracked separately and never merged: what
+          you <strong className="text-foreground">should</strong> receive, what
+          the government <strong className="text-foreground">says</strong> it
+          sent, what you <strong className="text-foreground">tell us</strong>{" "}
+          happened, and what the{" "}
+          <strong className="text-foreground">evidence proves</strong>. A payment
+          nobody has confirmed is shown as unconfirmed — never as received, and
+          never as lost.
+        </p>
+        {demoMode ? (
+          <Link
+            href="/demo"
+            className="mt-4 inline-block text-sm font-medium text-accent hover:underline"
           >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            Open the demo console →
+          </Link>
+        ) : null}
+      </section>
+    </main>
   );
 }
