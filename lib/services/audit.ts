@@ -89,6 +89,16 @@ export async function auditBenefit(input: {
   clock: Clock;
   actor?: Actor;
   triggeredByEventId?: string;
+  /**
+   * Whether this audit may move the lifecycle state. Defaults to true.
+   *
+   * Re-verification passes false: it has already moved the benefit to
+   * REVERIFYING and will decide between RECOVERED and RE_AUDIT_REQUIRED
+   * itself. Without this the audit would try to set GAP_DETECTED from
+   * REVERIFYING, which is illegal, and log an error on an entirely normal
+   * path.
+   */
+  manageLifecycle?: boolean;
 }): Promise<AuditResult> {
   const actor: Actor = input.actor ?? { kind: "agent", name: "audit" };
   const now = input.clock.now();
@@ -99,7 +109,16 @@ export async function auditBenefit(input: {
       scheme: true,
       application: { include: { documents: true } },
       expectedPayments: true,
-      payments: { include: { verifications: { orderBy: { verifiedAt: "desc" } } } },
+      payments: {
+        include: {
+          // Newest verification first. The id is a deterministic tiebreak:
+          // two verifications can share a timestamp (a citizen answering and
+          // uploading evidence in the same second, or a simulated clock), and
+          // "whichever row the database happened to return" must not decide
+          // whether money is recorded as missing.
+          verifications: { orderBy: [{ verifiedAt: "desc" }, { id: "desc" }] },
+        },
+      },
     },
   });
 
@@ -418,23 +437,67 @@ export async function auditBenefit(input: {
     },
   });
 
-  // Replace unresolved gaps for this entitlement so a resolved one does not
-  // linger and keep the benefit looking broken.
-  await prisma.benefitGap.deleteMany({
+  // Reconcile gaps by identity (kind + period) rather than deleting and
+  // recreating them.
+  //
+  // This was previously a deleteMany followed by inserts, which was a real
+  // bug: RootCause and ActionPlan cascade from BenefitGap, so every re-audit
+  // destroyed the record of what had already been diagnosed and tried. The
+  // recovery loop depends on that history to avoid repeating a failed action,
+  // and a system built for auditability must not erase its own trail.
+  //
+  // A gap that is no longer detected is marked RESOLVED with a timestamp, not
+  // deleted: "this was wrong and is now fixed" is information worth keeping.
+  const openGaps = await prisma.benefitGap.findMany({
     where: { entitlementId: entitlement.id, resolvedAt: null },
   });
 
+  const identityOf = (kind: string, period: string | null): string =>
+    `${kind}::${period ?? ""}`;
+
+  const detectedIdentities = new Set(
+    detection.gaps.map((gap) => identityOf(gap.kind, gap.periodLabel)),
+  );
+
   for (const gap of detection.gaps) {
-    await prisma.benefitGap.create({
-      data: {
-        entitlementId: entitlement.id,
-        auditId: audit.id,
-        kind: gap.kind,
-        periodLabel: gap.periodLabel,
-        amountPaise: gap.amount,
-        evidence: asJson(gap.evidence),
-        detectedAt: now,
-      },
+    const identity = identityOf(gap.kind, gap.periodLabel);
+    const existing = openGaps.find(
+      (row) => identityOf(row.kind, row.periodLabel) === identity,
+    );
+
+    if (existing) {
+      await prisma.benefitGap.update({
+        where: { id: existing.id },
+        data: {
+          auditId: audit.id,
+          amountPaise: gap.amount,
+          evidence: asJson(gap.evidence),
+        },
+      });
+    } else {
+      await prisma.benefitGap.create({
+        data: {
+          entitlementId: entitlement.id,
+          auditId: audit.id,
+          kind: gap.kind,
+          periodLabel: gap.periodLabel,
+          amountPaise: gap.amount,
+          evidence: asJson(gap.evidence),
+          detectedAt: now,
+        },
+      });
+    }
+  }
+
+  // Anything still open that this audit did not find has been resolved.
+  const resolvedIds = openGaps
+    .filter((row) => !detectedIdentities.has(identityOf(row.kind, row.periodLabel)))
+    .map((row) => row.id);
+
+  if (resolvedIds.length > 0) {
+    await prisma.benefitGap.updateMany({
+      where: { id: { in: resolvedIds } },
+      data: { resolvedAt: now },
     });
   }
 
@@ -484,7 +547,7 @@ export async function auditBenefit(input: {
           ? "APPROVED"
           : null;
 
-  if (target) {
+  if (target && (input.manageLifecycle ?? true)) {
     try {
       await transitionEntitlement(prisma, {
         entitlementId: entitlement.id,

@@ -250,42 +250,76 @@ registerStubFixture("bank.extractMatchingTransactions", () => ({
   notABankStatement: false,
 }));
 
+/**
+ * The numbered evidence lines from a diagnosis prompt, with their detail text.
+ *
+ * The fixture cites these VERBATIM rather than paraphrasing, because the real
+ * model is instructed to quote and the grounding check in rootCause.ts is
+ * designed to reject anything that is not traceable to supplied evidence. A
+ * fixture that paraphrased would be correctly rejected, which would make the
+ * stub behave unlike the model it stands in for.
+ */
+function evidenceLines(request: LlmRequest<unknown>): string[] {
+  const section = /Evidence:\n([\s\S]*)$/.exec(request.prompt)?.[1] ?? "";
+  return section
+    .split("\n")
+    .map((line) => /^\s*\d+\.\s*(?:\[[^\]]*\]\s*)?(.*)$/.exec(line)?.[1]?.trim())
+    .filter((detail): detail is string => Boolean(detail) && detail!.length > 0);
+}
+
 registerStubFixture("diagnose.rootCause", (request) => {
   const text = promptText(request);
+  const lines = evidenceLines(request);
 
-  // Keyed off the evidence the prompt actually contains, so the stub's
-  // diagnosis is still grounded in supplied facts.
+  /** Find a supplied evidence line matching every term, to cite verbatim. */
+  const cite = (...terms: string[]): string[] => {
+    const found = lines.find((line) => {
+      const lower = line.toLowerCase();
+      return terms.every((term) => lower.includes(term));
+    });
+    return found ? [found] : [];
+  };
+
   if (/aadhaar/.test(text) && /(seed|link|mismatch)/.test(text)) {
-    return {
-      kind: "AADHAAR_ISSUE",
-      citedEvidence: ["Government status mentions an Aadhaar seeding problem."],
-      reasoning:
-        "The disbursement failed and the status refers to Aadhaar seeding of the bank account, which prevents a Direct Benefit Transfer from completing.",
-      recommendedAction: "CORRECT_INFORMATION",
-    };
+    const cited = cite("aadhaar");
+    if (cited.length > 0) {
+      return {
+        kind: "AADHAAR_ISSUE",
+        citedEvidence: cited,
+        reasoning:
+          "The disbursement was returned and the status refers to Aadhaar seeding of the beneficiary account, which prevents a Direct Benefit Transfer from completing.",
+        recommendedAction: "CORRECT_INFORMATION",
+      };
+    }
   }
 
   if (/missing document|not attached|pending document/.test(text)) {
-    return {
-      kind: "MISSING_DOCUMENT",
-      citedEvidence: ["The application status records a required document as missing."],
-      reasoning:
-        "The department returned the application because a required document was not attached.",
-      recommendedAction: "REQUEST_DOCUMENT",
-    };
+    const cited = cite("document");
+    if (cited.length > 0) {
+      return {
+        kind: "MISSING_DOCUMENT",
+        citedEvidence: cited,
+        reasoning:
+          "The department returned the application because a required document was not attached.",
+        recommendedAction: "REQUEST_DOCUMENT",
+      };
+    }
   }
 
-  if (/pending for \d+ days|pending too long|stalled/.test(text)) {
-    return {
-      kind: "DELAYED_PROCESSING",
-      citedEvidence: ["The application has been pending beyond the normal processing window."],
-      reasoning:
-        "No decision has been recorded well beyond the expected processing time, with no request for further information.",
-      recommendedAction: "ESCALATE_GRIEVANCE",
-    };
+  if (/pending for \d+ days|pending too long|beyond the/.test(text)) {
+    const cited = cite("pending");
+    if (cited.length > 0) {
+      return {
+        kind: "DELAYED_PROCESSING",
+        citedEvidence: cited,
+        reasoning:
+          "No decision has been recorded well beyond the expected processing time, with no request for further information.",
+        recommendedAction: "ESCALATE_GRIEVANCE",
+      };
+    }
   }
 
-  // No supporting evidence found: UNKNOWN, never a plausible guess.
+  // Nothing citable: UNKNOWN, never a plausible guess.
   return {
     kind: "UNKNOWN",
     citedEvidence: [],
