@@ -19,7 +19,13 @@
  */
 
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+} from "react";
 
 import { translator, type Locale } from "@/lib/i18n";
 import { buttonClass } from "./ui";
@@ -67,6 +73,27 @@ function speechRecognition(): SpeechRecognitionLike | null {
   return Ctor ? new Ctor() : null;
 }
 
+/**
+ * Whether the browser can listen.
+ *
+ * Read through `useSyncExternalStore` rather than set from an effect. The
+ * server cannot know, so it must render "no"; setting state in an effect to
+ * correct that causes a cascading re-render on every mount, which React's
+ * lint flags and which this audience's devices can least afford. This gives
+ * React an explicit server snapshot instead.
+ *
+ * The result is cached because `getSnapshot` must return a stable value —
+ * constructing a recogniser on every call would loop.
+ */
+let voiceSupportCache: boolean | null = null;
+
+const subscribeToNothing = (): (() => void) => () => {};
+
+function voiceSupported(): boolean {
+  voiceSupportCache ??= speechRecognition() !== null;
+  return voiceSupportCache;
+}
+
 function describeProvenance(provenance: string, t: ReturnType<typeof translator>): string {
   if (provenance === "DOCUMENT_VERIFIED") return t("why.fromDocument");
   if (provenance === "SELF_DECLARED") return t("why.youToldUs");
@@ -91,14 +118,18 @@ export function OnboardChat({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [listening, setListening] = useState(false);
-  const [voiceAvailable, setVoiceAvailable] = useState(false);
+
+  const voiceAvailable = useSyncExternalStore(
+    subscribeToNothing,
+    voiceSupported,
+    // The server cannot know, so it renders without the button.
+    () => false,
+  );
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
-  useEffect(() => {
-    setVoiceAvailable(speechRecognition() !== null);
-    return () => recognitionRef.current?.stop();
-  }, []);
+  // Stop listening if the component goes away mid-sentence.
+  useEffect(() => () => recognitionRef.current?.stop(), []);
 
   function toggleVoice(): void {
     if (listening) {

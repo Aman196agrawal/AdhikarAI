@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { isDemoMode } from "@/lib/authz";
 import { realNow } from "@/lib/clock";

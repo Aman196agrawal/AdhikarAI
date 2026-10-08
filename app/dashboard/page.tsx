@@ -13,7 +13,6 @@
  */
 
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { deserialize, formatINR } from "@/lib/engine/money";
 import { translator } from "@/lib/i18n";

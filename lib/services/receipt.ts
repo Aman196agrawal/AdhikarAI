@@ -21,7 +21,6 @@
  */
 
 import { prisma } from "@/lib/db";
-import { ApiError } from "@/lib/api/http";
 import type { Clock } from "@/lib/clock";
 import { paise, type Paise } from "@/lib/engine/money";
 import { reconcile } from "@/lib/engine/reconciler";

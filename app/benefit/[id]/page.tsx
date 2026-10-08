@@ -12,7 +12,7 @@
  */
 
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { prisma } from "@/lib/db";
 import { readable } from "@/lib/engine/gaps";

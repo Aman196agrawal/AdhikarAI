@@ -29,7 +29,7 @@ import {
 } from "@/lib/services/application";
 import { auditBenefit } from "@/lib/services/audit";
 import { discoverAndPersist } from "@/lib/services/discovery";
-import { loadProfile, recordCitizenAnswer, saveProfileFields } from "@/lib/services/profile";
+import { loadProfile, saveProfileFields } from "@/lib/services/profile";
 import {
   createCitizen,
   disconnect,

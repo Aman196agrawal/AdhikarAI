@@ -60,6 +60,8 @@ the real model.
 ```bash
 npm run db:test        # creates and migrates a SEPARATE test database
 npm test               # 398 tests
+npm run lint           # eslint
+npx tsc --noEmit       # typecheck
 npm run smoke          # load every page against a running server
 ```
 
