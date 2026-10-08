@@ -16,6 +16,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { BankEvidenceUpload } from "./BankEvidenceUpload";
 import { buttonClass } from "./ui";
 
 type Answer = "YES" | "NO" | "NOT_SURE";
@@ -83,11 +84,7 @@ export function ReceiptAnswer({
         <p className="font-medium">Thank you. We have recorded that.</p>
         <p className="mt-1 text-sm text-muted">{result.nextStep}</p>
         {result.offerBankVerification ? (
-          <p className="mt-3 text-sm text-muted">
-            If you have a photo of your passbook or a bank statement, we can
-            check it for <strong className="text-foreground">this one payment</strong>{" "}
-            and nothing else. We do not keep the file.
-          </p>
+          <BankEvidenceUpload citizenId={citizenId} paymentId={paymentId} />
         ) : null}
       </div>
     );

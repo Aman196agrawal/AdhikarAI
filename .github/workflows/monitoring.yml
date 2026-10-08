@@ -1,0 +1,59 @@
+# Continuous monitoring.
+#
+# Vercel Hobby has no long-lived process and its own cron runs daily at best,
+# so the five-minute heartbeat comes from here. Each call processes a bounded
+# batch and reports whether more work remains; the loop below keeps going until
+# it does not, within a hard cap so a bad deploy cannot spin.
+#
+# Required repository secrets:
+#   MONITORING_URL   https://<your-deployment>/api/monitoring/tick
+#   CRON_SECRET      the same value as the deployment's CRON_SECRET
+name: monitoring
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  # Never let two passes overlap: they would audit the same benefits twice.
+  group: monitoring
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Run monitoring passes until the queue is clear
+        env:
+          MONITORING_URL: ${{ secrets.MONITORING_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${MONITORING_URL:-}" ] || [ -z "${CRON_SECRET:-}" ]; then
+            echo "MONITORING_URL and CRON_SECRET must be set as repository secrets."
+            exit 1
+          fi
+
+          for attempt in $(seq 1 10); do
+            response=$(curl --fail --silent --show-error --max-time 60 \
+              -X POST "$MONITORING_URL" \
+              -H "Authorization: Bearer $CRON_SECRET")
+
+            echo "pass $attempt: $response"
+
+            if ! echo "$response" | grep -q '"moreRemaining":true'; then
+              echo "Queue clear."
+              break
+            fi
+          done
+
+# Why not Vercel Cron as a backstop?
+#
+# Vercel Cron issues a GET. The tick endpoint deliberately refuses GET, because
+# a state-changing GET is triggerable by a prefetch or a crawler. On Hobby it is
+# also daily-only, so it was never a useful heartbeat. Weakening the endpoint to
+# accommodate it would have traded a real safety property for a backstop that
+# fires once a day.
