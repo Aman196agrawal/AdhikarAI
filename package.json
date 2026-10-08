@@ -19,7 +19,9 @@
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:scenarios": "vitest run tests/scenarios",
-    "test:boundaries": "vitest run tests/boundaries"
+    "test:boundaries": "vitest run tests/boundaries",
+    "seed:demo": "tsx prisma/seed-demo.ts",
+    "seed:all": "npm run seed && npm run seed:demo"
   },
   "dependencies": {
     "@google/genai": "^2.28.0",

@@ -73,6 +73,18 @@ export function systemClock(): Clock {
   };
 }
 
+/**
+ * True wall-clock time, regardless of any simulated offset.
+ *
+ * Exists so the demo console can show the real date beside the simulated one.
+ * It is the only legitimate reason to want unshifted time, and routing it
+ * through here keeps the "one place reads the clock" rule intact instead of
+ * scattering `Date.now()` into a route.
+ */
+export function realNow(): Date {
+  return new Date();
+}
+
 /** A clock frozen at one instant. Used by tests and by seeding. */
 export function fixedClock(at: Date): Clock {
   const ms = at.getTime();

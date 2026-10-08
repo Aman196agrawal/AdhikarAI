@@ -139,6 +139,85 @@ export function assertTransition(
   }
 }
 
+/**
+ * The shortest legal sequence of states from `from` to `to`, exclusive of
+ * `from` and inclusive of `to`. Empty when `to` is unreachable.
+ *
+ * The audit often learns several things at once - that an application was
+ * approved AND that a payment was then released AND that nobody has confirmed
+ * receipt. Applying only the final state would make the benefit appear to
+ * teleport, losing the fact that it was ever approved or disbursed. Walking
+ * the path records what actually happened, in order, which is what an audit
+ * trail is for.
+ */
+export function pathTo(
+  from: LifecycleState,
+  to: LifecycleState,
+  options?: {
+    /**
+     * States that may not be used as INTERMEDIATE hops (the destination is
+     * always allowed).
+     *
+     * Several states assert that an event occurred - RE_AUDIT_REQUIRED means a
+     * re-audit was needed, GAP_DETECTED means a problem was found. Routing
+     * through one of those on the way somewhere else would record something
+     * that never happened. Since more than one shortest path often exists,
+     * the caller says which ones would be untrue for its purpose rather than
+     * this function guessing.
+     */
+    avoid?: readonly LifecycleState[];
+  },
+): LifecycleState[] {
+  if (from === to) return [];
+
+  const avoid = new Set(options?.avoid ?? []);
+  const previous = new Map<LifecycleState, LifecycleState>();
+  const queue: LifecycleState[] = [from];
+  const seen = new Set<LifecycleState>([from]);
+
+  while (queue.length > 0) {
+    const current = queue.shift() as LifecycleState;
+
+    for (const next of TRANSITIONS[current] ?? []) {
+      if (seen.has(next)) continue;
+      // Allowed as a destination, never as a waypoint.
+      if (next !== to && avoid.has(next)) continue;
+      seen.add(next);
+      previous.set(next, current);
+
+      if (next === to) {
+        const path: LifecycleState[] = [to];
+        let step = to;
+        while (previous.get(step) !== from) {
+          step = previous.get(step) as LifecycleState;
+          path.unshift(step);
+        }
+        return path;
+      }
+
+      queue.push(next);
+    }
+  }
+
+  return [];
+}
+
+/**
+ * States whose presence asserts that something went wrong or was reworked.
+ *
+ * Passing through one of these on the way to somewhere else would record an
+ * event that did not happen, so a forward-progress walk avoids them as
+ * waypoints. They remain perfectly valid destinations.
+ */
+export const EXCEPTION_STATES: readonly LifecycleState[] = [
+  "REJECTED",
+  "GAP_DETECTED",
+  "PAYMENT_DISCREPANCY",
+  "RE_AUDIT_REQUIRED",
+  "RECOVERED",
+  "MONITORING",
+];
+
 /** Every state reachable from `start`, by breadth-first search. */
 export function reachableStates(start: LifecycleState): Set<LifecycleState> {
   const seen = new Set<LifecycleState>();

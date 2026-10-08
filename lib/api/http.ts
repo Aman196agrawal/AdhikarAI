@@ -107,13 +107,39 @@ export function parseQuery<T>(request: Request, schema: z.ZodType<T>): T {
  * a bare INTERNAL. A Prisma error message can contain column values, so it
  * must never reach the client.
  */
+/**
+ * The second argument Next passes to a dynamic route handler.
+ *
+ * Typed locally rather than relying on the globally generated `RouteContext`,
+ * so these handlers typecheck before `next typegen` has ever run.
+ */
+export interface RouteCtx {
+  params: Promise<Record<string, string>>;
+}
+
+/** Read one dynamic segment, failing clearly if the route is misdeclared. */
+export async function routeParam(
+  ctx: RouteCtx,
+  name: string,
+): Promise<string> {
+  const params = await ctx.params;
+  const value = params[name];
+  if (!value) {
+    throw new ApiError("BAD_REQUEST", `Missing route parameter "${name}".`);
+  }
+  return value;
+}
+
 export function handler(
   route: string,
-  fn: (request: Request) => Promise<Response>,
-): (request: Request) => Promise<Response> {
-  return async (request: Request) => {
+  fn: (request: Request, ctx: RouteCtx) => Promise<Response>,
+): (request: Request, ctx?: RouteCtx) => Promise<Response> {
+  // `ctx` is optional on the returned function so a route with no dynamic
+  // segment can be called with just a Request - which is how the scenario
+  // tests invoke these handlers. Next always supplies it in production.
+  return async (request: Request, ctx?: RouteCtx) => {
     try {
-      return await fn(request);
+      return await fn(request, ctx ?? { params: Promise.resolve({}) });
     } catch (error) {
       if (error instanceof ApiError) {
         log.warn("api.error", {

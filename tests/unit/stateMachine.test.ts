@@ -4,7 +4,9 @@ import {
   assertTransition,
   canTransition,
   initialStateFor,
+  EXCEPTION_STATES,
   nextStates,
+  pathTo,
   reachableStates,
   stateForReceipt,
   TRANSITIONS,
@@ -166,6 +168,56 @@ describe("the agentic loop closes", () => {
     expect(canTransition("VERIFIED_RECEIVED", "RE_AUDIT_REQUIRED")).toBe(true);
     expect(canTransition("MONITORING", "RE_AUDIT_REQUIRED")).toBe(true);
     expect(canTransition("RECOVERED", "RE_AUDIT_REQUIRED")).toBe(true);
+  });
+});
+
+describe("pathTo walks the real route", () => {
+  it("returns an empty path when already there", () => {
+    expect(pathTo("SUBMITTED", "SUBMITTED")).toEqual([]);
+  });
+
+  it("returns the single step for an adjacent state", () => {
+    expect(pathTo("ACTION_EXECUTED", "REVERIFYING")).toEqual(["REVERIFYING"]);
+  });
+
+  it("records approval and disbursement rather than teleporting", () => {
+    // An audit often learns at once that the application was approved, a
+    // payment was released, and nobody has confirmed receipt. Applying only
+    // the last would lose the fact that it was ever approved or disbursed.
+    // More than one shortest path exists, and one of them runs through
+    // RE_AUDIT_REQUIRED - which would assert a re-audit that never happened.
+    // The caller names the states that would be untrue for its purpose.
+    expect(
+      pathTo("SUBMITTED", "RECEIPT_UNVERIFIED", { avoid: EXCEPTION_STATES }),
+    ).toEqual(["APPROVED", "DISBURSED", "RECEIPT_UNVERIFIED"]);
+  });
+
+  it("produces a path whose every step is individually legal", () => {
+    const from = "ELIGIBLE";
+    const to = "RECOVERED";
+    const path = pathTo(from, to);
+
+    expect(path.length).toBeGreaterThan(0);
+    let current = from as (typeof path)[number];
+    for (const step of path) {
+      expect(canTransition(current, step), `${current} -> ${step}`).toBe(true);
+      current = step;
+    }
+    expect(path.at(-1)).toBe(to);
+  });
+
+  it("still routes through both approval gates", () => {
+    // The path finder must not be a way around consent.
+    const path = pathTo("ELIGIBLE", "SUBMITTED");
+    expect(path).toContain("AWAITING_APPLICATION_APPROVAL");
+
+    const recovery = pathTo("GAP_DETECTED", "ACTION_EXECUTED");
+    expect(recovery).toContain("AWAITING_ACTION_APPROVAL");
+  });
+
+  it("returns an empty path for an unreachable target", () => {
+    // Nothing leads back into discovery.
+    expect(pathTo("RECOVERED", "DISCOVERED")).toEqual([]);
   });
 });
 

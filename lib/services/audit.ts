@@ -26,7 +26,11 @@ import { auditContinuity, type ActualPaymentRecord } from "@/lib/engine/continui
 import { detectGaps, type DetectedGap } from "@/lib/engine/gaps";
 import { reconcile, type ReconcileResult } from "@/lib/engine/reconciler";
 import { projectLedger } from "@/lib/engine/ledger";
-import { stateForReceipt } from "@/lib/engine/stateMachine";
+import {
+  EXCEPTION_STATES,
+  pathTo,
+  stateForReceipt,
+} from "@/lib/engine/stateMachine";
 import { generateSchedule, periodLabel } from "@/lib/engine/period";
 import { log } from "@/lib/log";
 import type {
@@ -548,27 +552,43 @@ export async function auditBenefit(input: {
           : null;
 
   if (target && (input.manageLifecycle ?? true)) {
-    try {
+    // An audit routinely learns several things at once: that the application
+    // was approved, that a payment was then released, and that nobody has
+    // confirmed receipt. Walking the path records each of those rather than
+    // jumping to the last one, so the trail shows a benefit that was approved
+    // and disbursed instead of one that teleported into "unverified".
+    const path = pathTo(entitlement.lifecycleState, target, {
+      avoid: EXCEPTION_STATES,
+    });
+
+    if (path.length === 0 && entitlement.lifecycleState !== target) {
+      // Genuinely unreachable: the audit reached a conclusion the workflow
+      // cannot express from where this benefit sits. A real inconsistency, so
+      // it is logged loudly - but it must not discard the audit just computed.
+      log.error("audit.unreachable_state", {
+        entitlementId: entitlement.id,
+        from: entitlement.lifecycleState,
+        to: target,
+      });
+    }
+
+    let current = entitlement.lifecycleState;
+    for (const step of path) {
       await transitionEntitlement(prisma, {
         entitlementId: entitlement.id,
         citizenId: input.citizenId,
-        to: target,
+        to: step,
         actor,
-        reason: detection.summary,
+        // The final step carries the audit's summary; intermediate steps say
+        // what the audit established about them.
+        reason:
+          step === target
+            ? detection.summary
+            : `Established by audit: the benefit reached ${step.toLowerCase().replace(/_/g, " ")}.`,
         evidenceRef: audit.id,
-        from: entitlement.lifecycleState,
+        from: current,
       });
-    } catch (error) {
-      // An illegal transition means the audit reached a conclusion the
-      // workflow cannot express from where this benefit currently sits. That
-      // is a real inconsistency, so it is recorded loudly rather than
-      // swallowed - but it must not discard the audit we just computed.
-      log.error("audit.illegal_transition", {
-        entitlementId: entitlement.id,
-        from: entitlement.lifecycleState,
-        to: target,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      current = step;
     }
   }
 
