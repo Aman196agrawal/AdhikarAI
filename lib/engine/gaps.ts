@@ -178,7 +178,26 @@ export function detectGaps(input: GapDetectionInput): GapDetectionResult {
       break;
   }
 
-  if (missingDocuments.length > 0 && applicationStatus !== "RETURNED") {
+  // A document missing from our own records is only a gap while the
+  // department could still be waiting for it. Once an application is with the
+  // department (SUBMITTED, PENDING) it has asked for nothing further, and once
+  // APPROVED it is plainly satisfied - continuing to report "income
+  // certificate missing" against a benefit that is already being paid would
+  // flag a healthy benefit as broken and train the citizen to ignore alerts.
+  //
+  // A department that genuinely wants a document sets the status to RETURNED,
+  // which is handled above with the reason it gave.
+  const departmentMayBeWaiting =
+    applicationStatus === null ||
+    applicationStatus === "DRAFT" ||
+    applicationStatus === "REJECTED" ||
+    applicationStatus === "SUBMISSION_FAILED";
+
+  if (
+    missingDocuments.length > 0 &&
+    applicationStatus !== "RETURNED" &&
+    departmentMayBeWaiting
+  ) {
     gaps.push({
       kind: "MISSING_DOCUMENT",
       periodLabel: null,

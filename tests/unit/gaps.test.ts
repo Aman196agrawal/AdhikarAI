@@ -170,6 +170,56 @@ describe("application-stage gaps", () => {
   });
 });
 
+describe("a missing document is only a gap while it could still be wanted", () => {
+  const docs = ["INCOME_CERTIFICATE"];
+
+  it("flags it before anything has been submitted", () => {
+    const result = detectGaps(
+      input({ applicationStatus: null, verdict: "YELLOW", missingDocuments: docs }),
+    );
+    expect(kinds(result.gaps)).toContain("MISSING_DOCUMENT");
+  });
+
+  it("flags it on a draft", () => {
+    const result = detectGaps(
+      input({ applicationStatus: "DRAFT", missingDocuments: docs }),
+    );
+    expect(kinds(result.gaps)).toContain("MISSING_DOCUMENT");
+  });
+
+  it("does NOT flag it on a benefit the department has already approved", () => {
+    // Reporting "income certificate missing" against a benefit that is being
+    // paid would mark a healthy case as broken and teach the citizen to
+    // ignore alerts. A department that wants a document says RETURNED.
+    const result = detectGaps(
+      input({ applicationStatus: "APPROVED", missingDocuments: docs }),
+    );
+    expect(kinds(result.gaps)).not.toContain("MISSING_DOCUMENT");
+    expect(result.decision).toBe("HEALTHY");
+  });
+
+  it("does NOT flag it while the application sits with the department", () => {
+    for (const status of ["SUBMITTED", "PENDING"] as const) {
+      const result = detectGaps(
+        input({
+          applicationStatus: status,
+          daysSinceSubmission: 10,
+          missingDocuments: docs,
+        }),
+      );
+      expect(kinds(result.gaps), status).not.toContain("MISSING_DOCUMENT");
+    }
+  });
+
+  it("still flags it when the department returned the application", () => {
+    const result = detectGaps(
+      input({ applicationStatus: "RETURNED", missingDocuments: docs }),
+    );
+    // Reported once, with the department's own reason.
+    expect(kinds(result.gaps).filter((k) => k === "MISSING_DOCUMENT")).toHaveLength(1);
+  });
+});
+
 describe("continuity gaps feed through", () => {
   it("adds a missed period and its amount to the proven-missing total", () => {
     const result = detectGaps(
