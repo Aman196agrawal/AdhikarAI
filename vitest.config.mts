@@ -7,8 +7,9 @@ export default defineConfig({
   test: {
     environment: "node",
     include: ["tests/**/*.test.ts"],
-    // Scenario tests touch a real database; keep them serial so they cannot
-    // race each other through shared rows.
+    setupFiles: ["tests/setup.ts"],
+    // Scenario tests share one database. Running files serially keeps them
+    // from racing each other through the same rows.
     fileParallelism: false,
   },
   resolve: {

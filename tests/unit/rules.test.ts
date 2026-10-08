@@ -231,6 +231,70 @@ describe("scheme verdict aggregation", () => {
   });
 });
 
+describe("undecided exclusions become declarations, not blockers", () => {
+  const pmkisan = requireScheme("PM-KISAN");
+
+  // A farmer who has established every positive requirement but has not been
+  // asked whether she pays income tax, is a government employee, holds land
+  // institutionally, or practises a profession.
+  const farmer: Profile = {
+    isFarmer: proven(true),
+    landHoldingHectares: proven(0.809),
+    isAadhaarLinkedToBank: declared(true),
+  };
+
+  it("is GREEN on the positive evidence alone", () => {
+    // Holding this at YELLOW would mean asking an elderly claimant to deny
+    // four things before telling her anything useful, and almost nothing
+    // would ever read as eligible.
+    const result = evaluateScheme(pmkisan, farmer);
+    expect(result.verdict).toBe("GREEN");
+  });
+
+  it("carries the undecided exclusions forward as declarations", () => {
+    const result = evaluateScheme(pmkisan, farmer);
+    expect(result.pendingDeclarations).toContain("EXCL_INCOME_TAX_PAYER");
+    expect(result.pendingDeclarations).toContain("EXCL_GOVERNMENT_EMPLOYEE");
+    expect(result.pendingDeclarations).toContain("EXCL_PROFESSIONAL");
+  });
+
+  it("keeps declarations out of missing evidence, which is about eligibility", () => {
+    const result = evaluateScheme(pmkisan, farmer);
+    expect(result.missingEvidence).toEqual([]);
+    expect(result.unknownClauses).toEqual([]);
+  });
+
+  it("still goes RED when an exclusion is known to apply", () => {
+    // Deferring an UNKNOWN exclusion is not the same as ignoring a known one.
+    const result = evaluateScheme(pmkisan, {
+      ...farmer,
+      isGovernmentEmployee: proven(true),
+    });
+    expect(result.verdict).toBe("RED");
+    expect(result.blockingClauses).toContain("EXCL_GOVERNMENT_EMPLOYEE");
+  });
+
+  it("reports no pending declaration once the citizen has answered", () => {
+    const result = evaluateScheme(pmkisan, {
+      ...farmer,
+      isIncomeTaxPayer: declared(false),
+      isGovernmentEmployee: declared(false),
+      isInstitutionalLandholder: declared(false),
+      isProfessional: declared(false),
+      monthlyPensionRupees: declared(0),
+    });
+    expect(result.pendingDeclarations).toEqual([]);
+    expect(result.verdict).toBe("GREEN");
+  });
+
+  it("still holds a YELLOW when a positive requirement is unknown", () => {
+    // Exclusions are deferred; genuine eligibility gaps are not.
+    const result = evaluateScheme(pmkisan, { isFarmer: proven(true) });
+    expect(result.verdict).toBe("YELLOW");
+    expect(result.unknownClauses).toContain("HAS_CULTIVABLE_LAND");
+  });
+});
+
 describe("the demo personas resolve as designed", () => {
   const kamala: Profile = {
     age: proven(67),

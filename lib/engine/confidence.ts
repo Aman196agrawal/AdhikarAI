@@ -90,7 +90,15 @@ function labelFor(confidence: number, verdict: EligibilityVerdict): ConfidenceLa
 export function computeConfidence(
   evaluation: SchemeEvaluation,
 ): ConfidenceResult {
-  const mandatory = evaluation.clauses.filter((c) => c.mandatory);
+  // Exclusions are excluded from the denominator. They are resolved as
+  // self-declarations at application time (see SchemeEvaluation.
+  // pendingDeclarations), so counting them here would permanently depress
+  // confidence for every scheme that happens to list many of them - making
+  // PM-KISAN, with eight clauses of which five are exclusions, look far less
+  // certain than an identical entitlement expressed with fewer.
+  const mandatory = evaluation.clauses.filter(
+    (c) => c.mandatory && c.kind !== "EXCLUSION",
+  );
 
   const coverage: CoverageBreakdown = {
     documentVerified: 0,

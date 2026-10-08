@@ -83,8 +83,28 @@ export interface SchemeEvaluation {
   clauses: ClauseEvaluation[];
   /** Mandatory clause codes that are definitely violated (or exclusions that hold). */
   blockingClauses: string[];
-  /** Mandatory clause codes we could not decide. */
+  /**
+   * Mandatory POSITIVE requirements we could not decide. These hold the
+   * verdict at YELLOW, because eligibility genuinely is not established.
+   */
   unknownClauses: string[];
+  /**
+   * Undecided EXCLUSION clauses, which become self-declarations on the
+   * application form rather than blocking the verdict.
+   *
+   * Exclusions are framed negatively ("is an income tax payer", "is a
+   * government employee"). Holding a verdict at YELLOW until a citizen has
+   * pre-emptively denied every one of them would make almost nothing ever
+   * read as eligible, and would ask an elderly claimant eight suspicious
+   * questions before telling them anything useful.
+   *
+   * Real application forms resolve this the same way: the exclusions appear as
+   * declarations the applicant signs at submission. So discovery reports
+   * eligibility on the positive evidence and carries the exclusions forward to
+   * approval gate 1, where the citizen affirms them. Nothing is asserted on
+   * their behalf in the meantime.
+   */
+  pendingDeclarations: string[];
   /**
    * Human-readable descriptions of what would resolve the unknowns, e.g.
    * "BPL / ration card for: applicant must belong to a BPL family".
@@ -270,12 +290,22 @@ export function evaluateScheme(
     .filter((c) => c.mandatory && c.disqualifies)
     .map((c) => c.clauseCode);
 
-  const unknownClauses = clauses
-    .filter((c) => c.mandatory && c.result === "UNKNOWN")
+  const undecidedMandatory = clauses.filter(
+    (c) => c.mandatory && c.result === "UNKNOWN",
+  );
+
+  // An undecided POSITIVE requirement means eligibility is not established.
+  // An undecided EXCLUSION becomes a declaration at application time.
+  const unknownClauses = undecidedMandatory
+    .filter((c) => c.kind !== "EXCLUSION")
     .map((c) => c.clauseCode);
 
-  const missingEvidence = clauses
-    .filter((c) => c.mandatory && c.result === "UNKNOWN")
+  const pendingDeclarations = undecidedMandatory
+    .filter((c) => c.kind === "EXCLUSION")
+    .map((c) => c.clauseCode);
+
+  const missingEvidence = undecidedMandatory
+    .filter((c) => c.kind !== "EXCLUSION")
     .map(describeMissingEvidence);
 
   let verdict: EligibilityVerdict;
@@ -293,6 +323,7 @@ export function evaluateScheme(
     clauses,
     blockingClauses,
     unknownClauses,
+    pendingDeclarations,
     missingEvidence,
   };
 }

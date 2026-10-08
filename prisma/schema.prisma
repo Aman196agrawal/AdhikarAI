@@ -500,6 +500,15 @@ model Entitlement {
   clauseResults   Json
   missingEvidence String[]
 
+  /// Exclusion clauses the citizen must affirm on the application form.
+  ///
+  /// Undecided exclusions do not hold the verdict at YELLOW - requiring a
+  /// citizen to pre-emptively deny eight things before anything reads as
+  /// eligible is both noisy and unlike the real process, where these appear
+  /// as declarations signed at submission. They are carried here so approval
+  /// gate 1 knows which declarations to present.
+  pendingDeclarations String[]
+
   /// Citizen-facing explanation, generated from engine output only.
   reasoning String?
 
