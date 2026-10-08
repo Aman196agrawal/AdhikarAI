@@ -289,6 +289,16 @@ carries `isMock`, and the UI says so wherever those results appear.
 
 ---
 
+## Documents
+
+- [`docs/DEMO.md`](docs/DEMO.md) — a six-minute demo script, with the questions
+  you will probably get and how to answer them
+- [`docs/DEPLOY.md`](docs/DEPLOY.md) — Vercel + Neon, the monitoring heartbeat,
+  and the Hobby-tier constraints that shaped the architecture
+- [`docs/specs/`](docs/specs/) — the approved design document this was built to
+
+---
+
 ## Status
 
 Working prototype. 376 tests, clean typecheck, production build passing.
