@@ -1,0 +1,1065 @@
+// AdhikarAI data model.
+//
+// Design rules enforced here (see docs/specs/2026-10-08-adhikarai-design.md):
+//
+//  1. All money is BigInt PAISE. Never a float, never rupees.
+//  2. The gov_* tables are the SIMULATED GOVERNMENT's view and form a
+//     physically separate store from the citizen's view. They are reachable
+//     only through lib/adapters/govGateway.ts, never by direct query from the
+//     engine or the agents.
+//  3. Receipt state is five-valued and UNKNOWN is first class. An unverified
+//     receipt must never be recorded as a gap amount.
+//  4. Raw document bytes are never persisted. Document holds metadata only.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// How well a profile field is substantiated. Drives the confidence score and
+/// the GREEN vs YELLOW distinction. Weights live in lib/engine/confidence.ts.
+enum ProvenanceLevel {
+  DOCUMENT_VERIFIED
+  SELF_DECLARED
+  INFERRED
+  MISSING
+}
+
+/// Entitlement verdict (spec section 6). Decided by the engine, never the LLM.
+enum EligibilityVerdict {
+  GREEN
+  YELLOW
+  RED
+}
+
+enum ClauseKind {
+  ELIGIBILITY
+  EXCLUSION
+  DEPENDENCY
+}
+
+enum ClauseResult {
+  SATISFIED
+  VIOLATED
+  UNKNOWN
+}
+
+enum BenefitFrequency {
+  MONTHLY
+  QUARTERLY
+  TRIANNUAL
+  ANNUAL
+  ONE_TIME
+  AS_NEEDED
+}
+
+enum BenefitType {
+  CASH
+  IN_KIND
+  INSURANCE
+  LOAN
+  SERVICE
+}
+
+enum GovernmentLevel {
+  CENTRAL
+  STATE
+}
+
+enum DocumentKind {
+  AADHAAR
+  BANK_PASSBOOK
+  BANK_STATEMENT
+  LAND_RECORD
+  INCOME_CERTIFICATE
+  AGE_PROOF
+  DISABILITY_CERTIFICATE
+  DEATH_CERTIFICATE
+  RATION_CARD
+  CASTE_CERTIFICATE
+  RESIDENCE_PROOF
+  JOB_CARD
+  PHOTOGRAPH
+  OTHER
+}
+
+/// The benefit lifecycle (spec section 24). Transitions are declared in
+/// lib/engine/stateMachine.ts and nothing else may write this column.
+enum LifecycleState {
+  DISCOVERED
+  POTENTIAL_ENTITLEMENT
+  ELIGIBLE
+  APPLICATION_DRAFT
+  AWAITING_APPLICATION_APPROVAL
+  SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+  DISBURSED
+  RECEIPT_UNVERIFIED
+  CITIZEN_CONFIRMED
+  VERIFIED_RECEIVED
+  PAYMENT_DISCREPANCY
+  GAP_DETECTED
+  ROOT_CAUSE_IDENTIFIED
+  ACTION_PLANNED
+  AWAITING_ACTION_APPROVAL
+  ACTION_EXECUTED
+  REVERIFYING
+  RECOVERED
+  MONITORING
+  RE_AUDIT_REQUIRED
+}
+
+enum ApplicationStatus {
+  DRAFT
+  AWAITING_APPROVAL
+  SUBMITTED
+  PENDING
+  APPROVED
+  REJECTED
+  RETURNED
+  SUBMISSION_FAILED
+}
+
+enum ApplicationFieldSource {
+  PREFILLED_FROM_PROFILE
+  CITIZEN_EDITED
+  SCHEME_DEFAULT
+}
+
+/// The five receipt states. DISBURSED_RECEIPT_UNVERIFIED is the honest answer
+/// when the government reports payment and nothing confirms receipt; it must
+/// never be rendered as either received or missing.
+enum ReceiptState {
+  NOT_DISBURSED
+  DISBURSED_RECEIPT_UNVERIFIED
+  CITIZEN_CONFIRMED
+  VERIFIED_RECEIVED
+  PAYMENT_DISCREPANCY
+}
+
+/// What the citizen said. Absence of an answer is represented by NULL, which is
+/// distinct from NOT_SURE.
+enum CitizenReport {
+  YES
+  NO
+  NOT_SURE
+}
+
+enum VerificationMethod {
+  CITIZEN_CONFIRMATION
+  BANK_EVIDENCE
+  GOVERNMENT_RECORD
+  ASSISTED_VERIFICATION
+}
+
+enum EvidenceResult {
+  MATCHED
+  PARTIAL_MATCH
+  NO_MATCH
+  NOT_PROVIDED
+}
+
+enum AuditArea {
+  APPLICATION_STATUS
+  APPROVAL_STATUS
+  PAYMENT
+  RECEIPT
+  CONTINUITY
+}
+
+enum AuditDecision {
+  HEALTHY
+  NEEDS_VERIFICATION
+  ACTION_REQUIRED
+}
+
+enum GapKind {
+  NEVER_APPLIED
+  APPLICATION_PENDING_TOO_LONG
+  REJECTED
+  BLOCKED
+  MISSING_DOCUMENT
+  PAYMENT_MISSED
+  PAYMENT_DELAYED
+  PAYMENT_INTERRUPTED
+  UNCLAIMED
+  RECEIPT_UNVERIFIED
+  RENEWAL_MISSED
+  STATUS_UNKNOWN
+}
+
+enum RootCauseKind {
+  MISSING_DOCUMENT
+  DATA_MISMATCH
+  BANK_ISSUE
+  AADHAAR_ISSUE
+  ELIGIBILITY_ISSUE
+  VERIFICATION_ISSUE
+  TECHNICAL_FAILURE
+  APPLICATION_ERROR
+  REJECTION
+  DELAYED_PROCESSING
+  RENEWAL_ISSUE
+  UNKNOWN
+}
+
+enum ActionKind {
+  REQUEST_DOCUMENT
+  CORRECT_INFORMATION
+  REQUEST_CLARIFICATION
+  RESUBMIT
+  REAPPLY
+  SUBMIT_GRIEVANCE
+  ESCALATE_GRIEVANCE
+  RETRY_OPERATION
+  REQUEST_ASSISTED_VERIFICATION
+  WAIT_AND_MONITOR
+}
+
+enum ActionPlanStatus {
+  DRAFT
+  AWAITING_APPROVAL
+  APPROVED
+  REJECTED
+  EXECUTING
+  EXECUTED
+  FAILED
+  SUPERSEDED
+}
+
+enum ExecutionStatus {
+  PENDING
+  IN_PROGRESS
+  SUCCEEDED
+  FAILED
+  RETRY_REQUIRED
+  NEEDS_HUMAN_REVIEW
+}
+
+enum ApprovalKind {
+  APPLICATION_SUBMISSION
+  CORRECTIVE_ACTION
+}
+
+enum ApprovalDecision {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum MonitoringEventKind {
+  PAYMENT_DUE
+  PAYMENT_MISSED
+  RENEWAL_DUE
+  STATUS_CHANGED
+  NEW_DISCREPANCY
+  ELIGIBILITY_CHANGED
+  EXPECTED_BENEFIT_CHANGED
+  UNRESOLVED_AUDIT
+  ACTION_COMPLETED
+}
+
+enum RecoveryStatus {
+  NOT_APPLICABLE
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  UNRESOLVED
+}
+
+enum VerificationStatus {
+  SOURCE_CHECKED
+  COMPILED_UNVERIFIED
+}
+
+enum GovApplicationStatus {
+  RECEIVED
+  UNDER_REVIEW
+  PENDING_DOCUMENT
+  APPROVED
+  REJECTED
+  RETURNED
+}
+
+enum GovDisbursementStatus {
+  RELEASED
+  FAILED
+  RETURNED
+}
+
+// ---------------------------------------------------------------------------
+// Citizen side
+// ---------------------------------------------------------------------------
+
+model Citizen {
+  id String @id @default(cuid())
+
+  name   String
+  nameHi String?
+
+  /// Last four digits only. The full identifier is deliberately not stored.
+  aadhaarLast4     String?
+  bankAccountLast4 String?
+
+  phone  String?
+  locale String  @default("en")
+
+  /// Demo rows are clearly marked so the UI can badge them as mock data.
+  isDemo Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile          CitizenProfile?
+  documents        Document[]
+  entitlements     Entitlement[]
+  notifications    Notification[]
+  monitoringEvents MonitoringEvent[]
+  auditLogs        AuditLog[]
+  personas         DemoPersona[]
+}
+
+model CitizenProfile {
+  id        String @id @default(cuid())
+  citizenId String @unique
+
+  /// Free-text intake retained for traceability of extraction decisions.
+  rawIntake String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  citizen Citizen        @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  fields  ProfileField[]
+}
+
+/// One row per profile attribute, each carrying its own provenance. Storing
+/// provenance per field is what allows GREEN vs YELLOW to be honest and
+/// confidence to be computed deterministically instead of guessed.
+model ProfileField {
+  id        String @id @default(cuid())
+  profileId String
+
+  key        String
+  value      Json
+  provenance ProvenanceLevel
+
+  sourceDocumentId String?
+
+  /// Why the extractor believed this, for the evidence drawer.
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  profile        CitizenProfile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  sourceDocument Document?      @relation(fields: [sourceDocumentId], references: [id], onDelete: SetNull)
+
+  @@unique([profileId, key])
+  @@index([key])
+}
+
+/// Metadata only. Document bytes are never written to the database or to disk.
+model Document {
+  id        String @id @default(cuid())
+  citizenId String
+
+  filename String
+  mimeType String
+  kind     DocumentKind
+
+  /// Provenance for a file we processed but deliberately did not retain.
+  sha256    String
+  sizeBytes Int?
+
+  uploadedAt DateTime @default(now())
+
+  citizen              Citizen               @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  profileFields        ProfileField[]
+  applicationDocuments ApplicationDocument[]
+
+  @@index([citizenId])
+}
+
+// ---------------------------------------------------------------------------
+// Scheme registry
+// ---------------------------------------------------------------------------
+
+model Scheme {
+  id   String @id @default(cuid())
+  code String @unique
+
+  name   String
+  nameHi String?
+
+  governmentLevel GovernmentLevel
+
+  /// Empty array means applicable across India.
+  states String[]
+
+  category      String
+  description   String
+  descriptionHi String?
+
+  benefitType        BenefitType
+  benefitAmountPaise BigInt?
+
+  /// Set when the benefit is in-kind or otherwise not a fixed cash amount.
+  benefitNote String?
+
+  frequency           BenefitFrequency
+  durationMonths      Int?
+  installmentsPerYear Int?
+
+  applicationMethod String
+  applicationUrl    String?
+
+  /// Field definitions the Application Agent pre-fills. Validated by the engine.
+  formSchema        Json
+  requiredDocuments DocumentKind[]
+
+  /// Source metadata is mandatory: no scheme rule is hard-coded without it.
+  sourceName   String
+  sourceUrl    String
+  lastVerified DateTime
+
+  /// Distinguishes a record checked against its source URL from one compiled
+  /// from documentation. Surfaced in the UI so the registry cannot overstate
+  /// its own reliability.
+  verificationStatus VerificationStatus @default(COMPILED_UNVERIFIED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  clauses      RuleClause[]
+  entitlements Entitlement[]
+}
+
+/// A single eligibility / exclusion / dependency condition, carrying the
+/// official clause wording and its own source URL so every verdict is citable.
+model RuleClause {
+  id       String @id @default(cuid())
+  schemeId String
+
+  code String
+  kind ClauseKind
+
+  /// Profile field this clause tests, e.g. "age", "landHoldingHectares".
+  field String
+
+  /// Comparison operator; see lib/engine/rules.ts.
+  op    String
+  value Json
+
+  mandatory    Boolean        @default(true)
+  evidenceDocs DocumentKind[]
+
+  text   String
+  textHi String?
+
+  sourceName   String
+  sourceUrl    String
+  lastVerified DateTime
+
+  scheme Scheme @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+
+  @@unique([schemeId, code])
+  @@index([field])
+}
+
+// ---------------------------------------------------------------------------
+// Entitlement and expected payments
+// ---------------------------------------------------------------------------
+
+model Entitlement {
+  id        String @id @default(cuid())
+  citizenId String
+  schemeId  String
+
+  verdict EligibilityVerdict
+
+  /// Derived from rule coverage in lib/engine/confidence.ts. Never model output.
+  confidence Float
+
+  expectedAmountPaise BigInt?
+  frequency           BenefitFrequency
+
+  lifecycleState LifecycleState @default(DISCOVERED)
+
+  /// Per-clause outcome plus the provenance that produced it; powers "Why?".
+  clauseResults   Json
+  missingEvidence String[]
+
+  /// Citizen-facing explanation, generated from engine output only.
+  reasoning String?
+
+  discoveredAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  citizen          Citizen           @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  scheme           Scheme            @relation(fields: [schemeId], references: [id], onDelete: Cascade)
+  expectedPayments ExpectedPayment[]
+  application      Application?
+  payments         Payment[]
+  audits           BenefitAudit[]
+  gaps             BenefitGap[]
+  ledger           BenefitLedger?
+  monitoringEvents MonitoringEvent[]
+
+  @@unique([citizenId, schemeId])
+  @@index([lifecycleState])
+}
+
+/// The expected payment schedule, materialised forward from the scheme's
+/// frequency. This is the baseline the continuity audit reconciles against.
+model ExpectedPayment {
+  id            String @id @default(cuid())
+  entitlementId String
+
+  /// Stable period key, e.g. "2026-03" or "2026-Q1".
+  periodLabel String
+  dueOn       DateTime
+
+  expectedAmountPaise BigInt
+
+  createdAt DateTime @default(now())
+
+  entitlement Entitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  payment     Payment?
+
+  @@unique([entitlementId, periodLabel])
+  @@index([dueOn])
+}
+
+// ---------------------------------------------------------------------------
+// Application workflow (approval gate 1)
+// ---------------------------------------------------------------------------
+
+model Application {
+  id            String @id @default(cuid())
+  entitlementId String @unique
+
+  status ApplicationStatus @default(DRAFT)
+
+  /// Reference returned by the (mock) government portal.
+  govApplicationRef String?
+
+  /// Guards against duplicate external submission (spec section 40).
+  idempotencyKey String @unique
+
+  submittedAt DateTime?
+  decidedAt   DateTime?
+
+  rejectionReason String?
+  submissionError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entitlement Entitlement           @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  fields      ApplicationField[]
+  documents   ApplicationDocument[]
+  approvals   Approval[]
+}
+
+model ApplicationField {
+  id            String @id @default(cuid())
+  applicationId String
+
+  key    String
+  value  Json
+  source ApplicationFieldSource
+
+  valid           Boolean @default(true)
+  validationError String?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@unique([applicationId, key])
+}
+
+model ApplicationDocument {
+  id            String @id @default(cuid())
+  applicationId String
+
+  kind     DocumentKind
+  provided Boolean      @default(false)
+
+  documentId String?
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  document    Document?   @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@unique([applicationId, kind])
+}
+
+// ---------------------------------------------------------------------------
+// Payment, receipt verification and reconciliation
+// ---------------------------------------------------------------------------
+
+model Payment {
+  id            String @id @default(cuid())
+  entitlementId String
+
+  expectedPaymentId String? @unique
+
+  /// Reference from the (mock) disbursement record.
+  govDisbursementRef String?
+
+  periodLabel String
+
+  /// What the government says it released.
+  reportedAmountPaise BigInt
+  reportedOn          DateTime
+
+  /// Reconciled outcome. Written only by lib/engine/reconciler.ts.
+  receiptState ReceiptState @default(NOT_DISBURSED)
+
+  /// Non-zero ONLY with positive evidence of absence. Unverified receipts
+  /// contribute to BenefitLedger.unverifiedAmountPaise instead.
+  gapAmountPaise BigInt @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  entitlement     Entitlement           @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  expectedPayment ExpectedPayment?      @relation(fields: [expectedPaymentId], references: [id], onDelete: SetNull)
+  verifications   ReceiptVerification[]
+
+  @@index([entitlementId, periodLabel])
+}
+
+/// The minimal, privacy-preserving result of a receipt check.
+///
+/// For bank evidence this is ALL that survives: no statement, no balances, no
+/// unrelated transactions, no file. docSha256 proves a document was seen
+/// without retaining it.
+model ReceiptVerification {
+  id        String @id @default(cuid())
+  paymentId String
+
+  /// NULL means the citizen has not answered, which is distinct from NOT_SURE.
+  citizenReport CitizenReport?
+
+  evidenceResult EvidenceResult     @default(NOT_PROVIDED)
+  method         VerificationMethod
+
+  expectedAmountPaise BigInt
+  matchedAmountPaise  BigInt?
+  matchedOn           DateTime?
+
+  /// Last four characters of the bank reference, for citizen recognition only.
+  refLast4  String?
+  docSha256 String?
+
+  /// Reconciled state produced by this verification.
+  resultState ReceiptState
+
+  note String?
+
+  verifiedAt DateTime @default(now())
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@index([paymentId])
+}
+
+// ---------------------------------------------------------------------------
+// Audit, diagnosis, planning, execution
+// ---------------------------------------------------------------------------
+
+model BenefitAudit {
+  id            String @id @default(cuid())
+  entitlementId String
+
+  decision AuditDecision
+  summary  String
+
+  runAt DateTime @default(now())
+
+  /// Set when a monitoring event caused this audit.
+  triggeredByEventId String?
+
+  entitlement Entitlement    @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  findings    AuditFinding[]
+  gaps        BenefitGap[]
+
+  @@index([entitlementId, runAt])
+}
+
+model AuditFinding {
+  id      String @id @default(cuid())
+  auditId String
+
+  area    AuditArea
+  summary String
+
+  /// Evidence references, never raw document content.
+  evidence Json
+
+  audit BenefitAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+}
+
+model BenefitGap {
+  id            String  @id @default(cuid())
+  entitlementId String
+  auditId       String?
+
+  kind        GapKind
+  periodLabel String?
+
+  /// NULL when the amount is genuinely unknown. Never a guess.
+  amountPaise BigInt?
+
+  evidence Json
+
+  detectedAt DateTime  @default(now())
+  resolvedAt DateTime?
+
+  entitlement Entitlement   @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+  audit       BenefitAudit? @relation(fields: [auditId], references: [id], onDelete: SetNull)
+  rootCauses  RootCause[]
+  actionPlans ActionPlan[]
+
+  @@index([entitlementId, kind])
+}
+
+model RootCause {
+  id    String @id @default(cuid())
+  gapId String
+
+  /// Incremented when re-diagnosis follows a failed corrective action.
+  attempt Int @default(1)
+
+  kind       RootCauseKind
+  confidence Float
+
+  /// Must be non-empty; a diagnosis with no evidence is forced to UNKNOWN.
+  evidence Json
+
+  recommendedAction ActionKind
+  reasoning         String
+
+  createdAt DateTime @default(now())
+
+  gap BenefitGap @relation(fields: [gapId], references: [id], onDelete: Cascade)
+
+  @@unique([gapId, attempt])
+}
+
+model ActionPlan {
+  id    String @id @default(cuid())
+  gapId String
+
+  /// Attempt number. Re-planning after a failed re-verification creates
+  /// attempt 2, 3, ... which is what makes the loop a loop.
+  attempt Int @default(1)
+
+  status ActionPlanStatus @default(DRAFT)
+
+  summary         String
+  expectedOutcome String
+  evidenceNeeded  String[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  gap        BenefitGap        @relation(fields: [gapId], references: [id], onDelete: Cascade)
+  steps      ActionStep[]
+  approvals  Approval[]
+  executions ActionExecution[]
+
+  @@unique([gapId, attempt])
+}
+
+model ActionStep {
+  id     String @id @default(cuid())
+  planId String
+
+  position Int
+  kind     ActionKind
+
+  description String
+  reason      String
+
+  documentsRequired   DocumentKind[]
+  informationRequired String[]
+
+  channel String
+
+  plan       ActionPlan        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  executions ActionExecution[]
+
+  @@unique([planId, position])
+}
+
+model ActionExecution {
+  id     String  @id @default(cuid())
+  planId String
+  stepId String?
+
+  /// Prevents duplicate external side effects on retry (spec section 40).
+  idempotencyKey String @unique
+
+  status ExecutionStatus @default(PENDING)
+
+  /// Which adapter ran, e.g. "mockGovGateway", "grievance".
+  adapter String
+
+  request  Json
+  response Json?
+  error    String?
+
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  plan ActionPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  step ActionStep? @relation(fields: [stepId], references: [id], onDelete: SetNull)
+}
+
+/// Both human-in-the-loop gates. Nothing consequential leaves the system
+/// without a matching APPROVED row.
+model Approval {
+  id   String       @id @default(cuid())
+  kind ApprovalKind
+
+  applicationId String?
+  actionPlanId  String?
+
+  decision  ApprovalDecision @default(PENDING)
+
+  /// e.g. "citizen:<id>".
+  decidedBy String?
+  decidedAt DateTime?
+
+  /// Exactly what was shown to the human at the moment of approval.
+  shownEvidence Json
+
+  /// Any fields the human corrected before approving.
+  edits Json?
+  note  String?
+
+  createdAt DateTime @default(now())
+
+  application Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  actionPlan  ActionPlan?  @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+
+  @@index([decision])
+}
+
+// ---------------------------------------------------------------------------
+// Ledger and monitoring
+// ---------------------------------------------------------------------------
+
+/// The spec section 19 projection. Feeds the dashboard, monitoring and re-audit.
+///
+/// Note the deliberate separation of gapAmountPaise (proven absent) from
+/// unverifiedAmountPaise (genuinely unknown). Collapsing these two is the
+/// single mistake this product exists to avoid.
+model BenefitLedger {
+  id            String @id @default(cuid())
+  entitlementId String @unique
+
+  expectedAmountPaise BigInt
+
+  appliedAt DateTime?
+
+  approvedAmountPaise  BigInt?
+  disbursedAmountPaise BigInt  @default(0)
+  receivedAmountPaise  BigInt  @default(0)
+
+  unverifiedAmountPaise BigInt @default(0)
+  gapAmountPaise        BigInt @default(0)
+  recoveredAmountPaise  BigInt @default(0)
+
+  receiptState   ReceiptState   @default(NOT_DISBURSED)
+  recoveryStatus RecoveryStatus @default(NOT_APPLICABLE)
+
+  lastVerifiedAt DateTime?
+  lastAuditAt    DateTime?
+
+  updatedAt DateTime @updatedAt
+
+  entitlement Entitlement @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+}
+
+model MonitoringEvent {
+  id            String  @id @default(cuid())
+  citizenId     String
+  entitlementId String?
+
+  kind    MonitoringEventKind
+  payload Json
+
+  detectedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  triggeredAuditId String?
+
+  citizen     Citizen      @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+  entitlement Entitlement? @relation(fields: [entitlementId], references: [id], onDelete: Cascade)
+
+  @@index([processedAt])
+  @@index([citizenId, kind])
+}
+
+model Notification {
+  id        String @id @default(cuid())
+  citizenId String
+
+  title   String
+  titleHi String?
+  body    String
+  bodyHi  String?
+
+  actionUrl String?
+  readAt    DateTime?
+
+  createdAt DateTime @default(now())
+
+  citizen Citizen @relation(fields: [citizenId], references: [id], onDelete: Cascade)
+
+  @@index([citizenId, readAt])
+}
+
+/// Append-only trail for every consequential action (spec section 41).
+/// Deliberately holds no sensitive document content.
+model AuditLog {
+  id        String  @id @default(cuid())
+  citizenId String?
+
+  /// "agent:discovery", "citizen:<id>", "cron", "demo-console".
+  actor String
+
+  entity   String
+  entityId String
+
+  fromState String?
+  toState   String?
+
+  reason      String
+  evidenceRef String?
+
+  createdAt DateTime @default(now())
+
+  citizen Citizen? @relation(fields: [citizenId], references: [id], onDelete: SetNull)
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Simulated government store (DEMO)
+//
+// A physically separate store representing what the government believes.
+// Reachable only via lib/adapters/govGateway.ts. The demo console mutates
+// these tables, which is why it can create a genuine disagreement between the
+// two sides rather than a staged one.
+// ---------------------------------------------------------------------------
+
+model GovApplication {
+  id             String @id @default(cuid())
+  applicationRef String @unique
+
+  schemeCode String
+
+  /// The government side identifies citizens by partial Aadhaar, as a real
+  /// portal would, rather than by our internal citizen id.
+  aadhaarLast4 String
+
+  status     GovApplicationStatus
+  receivedOn DateTime
+  decidedOn  DateTime?
+
+  rejectionReason String?
+  pendingDocument String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schemeCode, aadhaarLast4])
+  @@map("gov_application")
+}
+
+model GovDisbursement {
+  id              String @id @default(cuid())
+  disbursementRef String @unique
+
+  applicationRef String
+  schemeCode     String
+  aadhaarLast4   String
+
+  amountPaise BigInt
+  periodLabel String
+  releasedOn  DateTime
+
+  /// e.g. "DBT", "PFMS".
+  channel          String
+  bankAccountLast4 String?
+
+  status        GovDisbursementStatus @default(RELEASED)
+  failureReason String?
+
+  createdAt DateTime @default(now())
+
+  @@index([applicationRef])
+  @@index([schemeCode, aadhaarLast4])
+  @@map("gov_disbursement")
+}
+
+model GovStatusEvent {
+  id String @id @default(cuid())
+
+  applicationRef String
+  schemeCode     String
+
+  status String
+  note   String
+
+  occurredOn DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([applicationRef])
+  @@map("gov_status_event")
+}
+
+// ---------------------------------------------------------------------------
+// Demo control
+// ---------------------------------------------------------------------------
+
+/// Singleton row holding the simulated-clock offset. All engine and agent code
+/// reads time through lib/clock.ts, never new Date() directly, so advancing
+/// this offset makes months of benefit history elapse on stage in seconds.
+model DemoClock {
+  id String @id @default("singleton")
+
+  offsetDays Int @default(0)
+
+  /// Extra minutes, for finer-grained demo steps.
+  offsetMinutes Int @default(0)
+
+  updatedAt DateTime @updatedAt
+}
+
+model DemoPersona {
+  id   String @id @default(cuid())
+  code String @unique
+
+  label       String
+  description String
+
+  citizenId String?
+  position  Int     @default(0)
+
+  citizen Citizen? @relation(fields: [citizenId], references: [id], onDelete: SetNull)
+}

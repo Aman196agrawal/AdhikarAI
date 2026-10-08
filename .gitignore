@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/lib/generated/prisma
+
+# .env* above also excludes the example file, which carries no secrets and
+# documents required configuration. Keep it tracked.
+!.env.example
+
+# Vendored agent-skill copies written by `prisma init` for other editors.
+# Regenerable, and recorded in skills-lock.json.
+/.agents/
+/.windsurf/
