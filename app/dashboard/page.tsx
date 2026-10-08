@@ -218,6 +218,9 @@ export default async function DashboardPage() {
             </StatusPill>
           ) : null}
           <LocaleToggle locale={locale} />
+          <Link href="/onboard" className={buttonClass.secondary}>
+            {locale === "hi" ? "मेरी जानकारी" : "My details"}
+          </Link>
           <Link href="/" className={buttonClass.secondary}>
             {t("app.switchPerson")}
           </Link>

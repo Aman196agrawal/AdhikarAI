@@ -134,6 +134,8 @@ async function main() {
     // The Hindi check is not decoration: a translation that silently falls
     // back would leave a Hindi reader with English they cannot read.
     await check("dashboard (hi)", "/dashboard", hi, ["आपका पैसा", "अभी पुष्टि नहीं"]),
+    await check("onboarding", "/onboard", en, ["Tell us about yourself"]),
+    await check("onboarding (hi)", "/onboard", hi, ["अपने बारे में बताइए"]),
     await check("demo console", "/demo", en, ["Drive the simulation"]),
   ];
 
