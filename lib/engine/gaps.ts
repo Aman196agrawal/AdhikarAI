@@ -48,8 +48,23 @@ export interface GapDetectionInput {
   daysSinceSubmission?: number | null;
   rejectionReason?: string | null;
   missingDocuments?: string[];
-  /** Result of reconciling the most recent payment, if any. */
+  /**
+   * A single reconciliation with no period attached. Kept for callers that
+   * reconcile one payment in isolation.
+   */
   reconciliation?: ReconcileResult | null;
+  /**
+   * EVERY payment period's reconciliation.
+   *
+   * The audit must pass these rather than only the latest. Previously only the
+   * most recent payment was considered, so a new month's unconfirmed payment
+   * silently hid last month's proven discrepancy: the gap was marked resolved
+   * while the money was still missing.
+   */
+  periodReconciliations?: ReadonlyArray<{
+    periodLabel: string | null;
+    result: ReconcileResult;
+  }>;
   continuityGaps?: readonly ContinuityGap[];
   /** Threshold past which a pending application counts as stalled. */
   pendingTooLongDays?: number;
@@ -76,6 +91,7 @@ export function detectGaps(input: GapDetectionInput): GapDetectionResult {
     rejectionReason = null,
     missingDocuments = [],
     reconciliation = null,
+    periodReconciliations = [],
     continuityGaps = [],
     pendingTooLongDays = DEFAULT_PENDING_TOO_LONG_DAYS,
   } = input;
@@ -213,28 +229,32 @@ export function detectGaps(input: GapDetectionInput): GapDetectionResult {
   let totalProvenMissing = ZERO;
   let totalUnverified = ZERO;
 
-  if (reconciliation) {
-    totalProvenMissing = add(totalProvenMissing, reconciliation.gapAmount);
-    totalUnverified = add(totalUnverified, reconciliation.unverifiedAmount);
+  const toReconcile: Array<{ periodLabel: string | null; result: ReconcileResult }> =
+    [
+      ...(reconciliation ? [{ periodLabel: null, result: reconciliation }] : []),
+      ...periodReconciliations,
+    ];
 
-    if (reconciliation.receiptState === "PAYMENT_DISCREPANCY") {
+  for (const { periodLabel, result } of toReconcile) {
+    totalProvenMissing = add(totalProvenMissing, result.gapAmount);
+    totalUnverified = add(totalUnverified, result.unverifiedAmount);
+
+    if (result.receiptState === "PAYMENT_DISCREPANCY") {
       gaps.push({
         kind: "PAYMENT_MISSED",
-        periodLabel: null,
-        amount: reconciliation.gapAmount > ZERO ? reconciliation.gapAmount : null,
-        evidence: reconciliation.reasons,
+        periodLabel,
+        amount: result.gapAmount > ZERO ? result.gapAmount : null,
+        evidence: result.reasons,
         needsAction: true,
       });
-    } else if (
-      reconciliation.receiptState === "DISBURSED_RECEIPT_UNVERIFIED"
-    ) {
+    } else if (result.receiptState === "DISBURSED_RECEIPT_UNVERIFIED") {
       gaps.push({
         kind: "RECEIPT_UNVERIFIED",
-        periodLabel: null,
+        periodLabel,
         // Deliberately NULL. The amount is not missing; it is unconfirmed.
         // Putting a figure here would let it be summed into a "missing" total.
         amount: null,
-        evidence: reconciliation.reasons,
+        evidence: result.reasons,
         // Verification, not a corrective action. Asking the citizen a yes/no
         // question is not the same as filing a grievance on their behalf.
         needsAction: false,

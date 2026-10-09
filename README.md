@@ -59,7 +59,7 @@ the real model.
 
 ```bash
 npm run db:test        # creates and migrates a SEPARATE test database
-npm test               # 398 tests
+npm test               # 425 tests
 npm run lint           # eslint
 npx tsc --noEmit       # typecheck
 npm run smoke          # load every page against a running server
@@ -311,7 +311,7 @@ carries `isMock`, and the UI says so wherever those results appear.
 
 ## Status
 
-Working prototype. 376 tests, clean typecheck, production build passing.
+Working prototype. 425 tests, clean typecheck and lint, production build passing.
 
 Not built, and deliberately so: production authentication (the demo uses a
 persona selector, confined to one function so real auth replaces one file),

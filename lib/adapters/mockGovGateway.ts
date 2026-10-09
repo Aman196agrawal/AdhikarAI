@@ -24,12 +24,13 @@
  *     arrive, which is the entire point.
  */
 
+import { createHash } from "node:crypto";
+
 import { prisma } from "@/lib/db";
 import { log } from "@/lib/log";
 import type {
   CorrectInformationInput,
   GovApplicationStatusResult,
-  GovCitizenRef,
   GovDisbursementRecord,
   GovGateway,
   GovOperationResult,
@@ -39,14 +40,21 @@ import type {
 } from "./govGateway";
 import type { GovApplicationStatus } from "@/lib/generated/prisma/enums";
 
-/** Deterministic reference, so a demo run is reproducible. */
+/**
+ * Deterministic reference, so a demo run is reproducible.
+ *
+ * Hashed rather than truncated. The previous version kept the first fourteen
+ * characters of the joined parts, and the ids fed into it are time-ordered,
+ * so two records created close together shared a prefix and got the same
+ * reference.
+ */
 function makeRef(prefix: string, parts: string[]): string {
-  const body = parts
-    .join("-")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "")
-    .slice(0, 14);
-  return `${prefix}${body}`;
+  const digest = createHash("sha256")
+    .update(parts.join("|"))
+    .digest("hex")
+    .slice(0, 10)
+    .toUpperCase();
+  return `${prefix}${digest}`;
 }
 
 async function toStatusResult(
@@ -143,9 +151,13 @@ export function createMockGovGateway(options?: {
         };
       }
 
+      // Keyed on the caller's idempotency key (one per entitlement), NOT on the
+      // last four digits of Aadhaar. Keying on those four digits meant two
+      // different citizens who happened to share them could not both apply:
+      // the second was told an application already existed.
       const applicationRef = makeRef("GOVAPP", [
         input.schemeCode,
-        input.aadhaarLast4,
+        input.idempotencyKey,
       ]);
 
       // Idempotency: the same key returning the same application is what
@@ -155,21 +167,21 @@ export function createMockGovGateway(options?: {
       });
 
       if (existingByRef) {
-        // A real portal refuses a second application for the same scheme and
-        // person. Reporting it as a duplicate - with the existing reference -
-        // lets the citizen be shown the application they already have rather
-        // than a generic error.
-        log.info("gov.submit.duplicate", {
+        // Same idempotency key, so this is a retry of a submission that already
+        // landed - a double-click, or a timeout after the portal had in fact
+        // accepted it. Return the original as a success. Reporting it as a
+        // failure would flip a lodged application to SUBMISSION_FAILED.
+        log.info("gov.submit.deduplicated", {
           schemeCode: input.schemeCode,
           applicationRef,
           simulated: true,
         });
         return {
-          ok: false,
-          reason: "DUPLICATE_APPLICATION",
-          message:
-            "An application for this scheme already exists for this citizen.",
+          ok: true,
           applicationRef,
+          status: existingByRef.status,
+          receivedOn: existingByRef.receivedOn,
+          deduplicated: true,
         };
       }
 
@@ -224,23 +236,11 @@ export function createMockGovGateway(options?: {
       return toStatusResult(applicationRef);
     },
 
-    async findApplication(ref: GovCitizenRef) {
-      const application = await prisma.govApplication.findFirst({
-        where: { schemeCode: ref.schemeCode, aadhaarLast4: ref.aadhaarLast4 },
-        orderBy: { receivedOn: "desc" },
-      });
-      return application ? toStatusResult(application.applicationRef) : null;
-    },
-
-    async listDisbursements(
-      ref: GovCitizenRef & { applicationRef?: string },
-    ): Promise<GovDisbursementRecord[]> {
+    async listDisbursements(ref: {
+      applicationRef: string;
+    }): Promise<GovDisbursementRecord[]> {
       const rows = await prisma.govDisbursement.findMany({
-        where: {
-          schemeCode: ref.schemeCode,
-          aadhaarLast4: ref.aadhaarLast4,
-          ...(ref.applicationRef ? { applicationRef: ref.applicationRef } : {}),
-        },
+        where: { applicationRef: ref.applicationRef },
         orderBy: { releasedOn: "asc" },
       });
 
@@ -281,7 +281,7 @@ export function createMockGovGateway(options?: {
       }
 
       const reference = makeRef("GOVCOR", [input.idempotencyKey]);
-      const acceptedOn = application.updatedAt;
+      const acceptedOn = input.requestedAt;
 
       await prisma.govStatusEvent.create({
         data: {
@@ -341,14 +341,14 @@ export function createMockGovGateway(options?: {
           status: clearsHold ? "UNDER_REVIEW" : application.status,
           // The hash records that a document was received without retaining it.
           note: `Document ${input.documentKind} received (sha256 ${input.documentSha256.slice(0, 12)}...).`,
-          occurredOn: application.updatedAt,
+          occurredOn: input.requestedAt,
         },
       });
 
       return {
         ok: true,
         reference: makeRef("GOVDOC", [input.idempotencyKey]),
-        acceptedOn: application.updatedAt,
+        acceptedOn: input.requestedAt,
         note: clearsHold
           ? "The document was accepted and the application returned to review. (Simulated.)"
           : "The document was accepted. (Simulated.)",

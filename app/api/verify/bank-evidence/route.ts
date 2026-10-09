@@ -18,8 +18,6 @@ import { requireCitizen } from "@/lib/authz";
 import { prisma } from "@/lib/db";
 import { paise, serialize } from "@/lib/engine/money";
 import { reconcile } from "@/lib/engine/reconciler";
-import { stateForReceipt } from "@/lib/engine/stateMachine";
-import { log } from "@/lib/log";
 import {
   MAX_UPLOAD_BYTES,
   MAX_UPLOAD_LABEL,
@@ -27,11 +25,24 @@ import {
   verifyBankEvidence,
 } from "@/lib/documents/bankEvidence";
 import { currentClock } from "@/lib/services/clock";
-import { recordAudit, transitionEntitlement } from "@/lib/services/transitions";
+import { expectedForPayment } from "@/lib/services/expected";
+import { auditBenefit } from "@/lib/services/audit";
+import { recordAudit } from "@/lib/services/transitions";
 
 export const runtime = "nodejs";
 
 export const POST = handler("POST /api/verify/bank-evidence", async (request) => {
+  // Refuse an oversized upload from its declared length, BEFORE reading the
+  // body. formData() buffers the entire request in memory, so checking the
+  // file size afterwards meant a huge upload was fully read first.
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (declared > MAX_UPLOAD_BYTES + 64 * 1024) {
+    throw new ApiError(
+      "BAD_REQUEST",
+      `That file is larger than ${MAX_UPLOAD_LABEL}. A photo of the single page showing the payment is enough.`,
+    );
+  }
+
   const form = await request.formData().catch(() => null);
   if (!form) {
     throw new ApiError("BAD_REQUEST", "Expected a file upload.");
@@ -65,7 +76,7 @@ export const POST = handler("POST /api/verify/bank-evidence", async (request) =>
   const payment = await prisma.payment.findFirst({
     where: { id: paymentId, entitlement: { citizenId: citizen.citizenId } },
     include: {
-      entitlement: { include: { scheme: { select: { name: true } } } },
+      entitlement: { include: { scheme: { select: { name: true, code: true } } } },
       verifications: { orderBy: [{ verifiedAt: "desc" }, { id: "desc" }], take: 1 },
     },
   });
@@ -73,10 +84,14 @@ export const POST = handler("POST /api/verify/bank-evidence", async (request) =>
   if (!payment) throw new ApiError("NOT_FOUND", "No such payment.");
 
   const clock = await currentClock();
+  // The stage actually sent, for a staged benefit - not the full entitlement,
+  // or the statement is searched for a credit far larger than the real one.
   const expected =
-    payment.entitlement.expectedAmountPaise === null
-      ? paise(payment.reportedAmountPaise)
-      : paise(payment.entitlement.expectedAmountPaise);
+    expectedForPayment({
+      schemeCode: payment.entitlement.scheme.code,
+      entitlementExpected: payment.entitlement.expectedAmountPaise,
+      reportedAmount: payment.reportedAmountPaise,
+    }) ?? paise(payment.reportedAmountPaise);
 
   // Read into memory. This buffer is the only copy, and it is never written
   // anywhere; it goes out of scope when this handler returns.
@@ -102,10 +117,7 @@ export const POST = handler("POST /api/verify/bank-evidence", async (request) =>
   const previousAnswer = payment.verifications[0]?.citizenReport ?? null;
 
   const result = reconcile({
-    expectedAmount:
-      payment.entitlement.expectedAmountPaise === null
-        ? null
-        : paise(payment.entitlement.expectedAmountPaise),
+    expectedAmount: expected,
     governmentReportedAmount: paise(payment.reportedAmountPaise),
     citizenReport: previousAnswer,
     evidence: { result: evidence.result, matchedAmount: evidence.matchedAmount },
@@ -137,17 +149,6 @@ export const POST = handler("POST /api/verify/bank-evidence", async (request) =>
     },
   });
 
-  await prisma.benefitLedger.updateMany({
-    where: { entitlementId: payment.entitlementId },
-    data: {
-      receiptState: result.receiptState,
-      gapAmountPaise: result.gapAmount,
-      unverifiedAmountPaise: result.unverifiedAmount,
-      receivedAmountPaise: result.receivedAmount,
-      lastVerifiedAt: clock.now(),
-    },
-  });
-
   await recordAudit(prisma, {
     citizenId: citizen.citizenId,
     actor: { kind: "citizen", citizenId: citizen.citizenId },
@@ -159,21 +160,14 @@ export const POST = handler("POST /api/verify/bank-evidence", async (request) =>
     reason: `Checked against a supplied document (sha256 ${evidence.docSha256.slice(0, 12)}...). ${evidence.explanation}`,
   });
 
-  try {
-    await transitionEntitlement(prisma, {
-      entitlementId: payment.entitlementId,
-      citizenId: citizen.citizenId,
-      to: stateForReceipt(result.receiptState),
-      actor: { kind: "citizen", citizenId: citizen.citizenId },
-      reason: result.reasons.join(" "),
-      evidenceRef: payment.id,
-    });
-  } catch {
-    // The benefit is somewhere this receipt state cannot be reached from, such
-    // as mid-recovery. The verification stands; the next audit reconciles the
-    // lifecycle. The citizen's evidence must not be lost to a workflow detail.
-    log.info("bankEvidence.transition_skipped", { paymentId: payment.id });
-  }
+  // Re-audit rather than writing this one payment's figures into the ledger,
+  // which overwrote every other period's totals. See confirmReceipt.
+  await auditBenefit({
+    citizenId: citizen.citizenId,
+    entitlementId: payment.entitlementId,
+    clock,
+    actor: { kind: "citizen", citizenId: citizen.citizenId },
+  });
 
   return ok({
     paymentId: payment.id,

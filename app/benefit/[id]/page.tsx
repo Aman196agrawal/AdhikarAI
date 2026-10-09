@@ -18,6 +18,7 @@ import { prisma } from "@/lib/db";
 import { readable } from "@/lib/engine/gaps";
 import { serialize } from "@/lib/engine/money";
 import { requireSelectedCitizen } from "@/lib/session";
+import { ApplyPanel } from "@/components/ApplyPanel";
 import { BenefitActions } from "@/components/BenefitActions";
 import {
   Card,
@@ -76,7 +77,7 @@ export default async function BenefitPage({
     where: { id, citizenId: citizen.citizenId },
     include: {
       scheme: true,
-      application: true,
+      application: { include: { approvals: true } },
       ledger: true,
       expectedPayments: { orderBy: { dueOn: "asc" } },
       payments: {
@@ -117,6 +118,25 @@ export default async function BenefitPage({
   const resolvedGaps = entitlement.gaps.filter((g) => g.resolvedAt !== null);
 
   const paidPeriods = new Set(entitlement.payments.map((p) => p.periodLabel));
+
+  // The application path is open while nothing has reached the portal.
+  const applicationStatus = entitlement.application?.status ?? null;
+  const canApply =
+    entitlement.verdict !== "RED" &&
+    (applicationStatus === null ||
+      applicationStatus === "DRAFT" ||
+      applicationStatus === "AWAITING_APPROVAL" ||
+      applicationStatus === "SUBMISSION_FAILED");
+  const pendingApplicationApproval =
+    entitlement.application?.approvals.find(
+      (a) => a.kind === "APPLICATION_SUBMISSION" && a.decision === "PENDING",
+    )?.id ?? null;
+  const approvedButUnsent =
+    applicationStatus === "SUBMISSION_FAILED" &&
+    (entitlement.application?.approvals.some(
+      (a) => a.kind === "APPLICATION_SUBMISSION" && a.decision === "APPROVED",
+    ) ??
+      false);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -237,6 +257,17 @@ export default async function BenefitPage({
               {entitlement.pendingDeclarations.length === 1 ? "" : "s"} — the
               things this scheme requires you <em>not</em> to be.
             </p>
+          ) : null}
+
+          {canApply ? (
+            <ApplyPanel
+              citizenId={citizen.citizenId}
+              entitlementId={entitlement.id}
+              applicationStatus={applicationStatus}
+              applicationId={entitlement.application?.id ?? null}
+              pendingApprovalId={pendingApplicationApproval}
+              canRetrySubmission={approvedButUnsent}
+            />
           ) : null}
 
           {clauses.length > 0 ? (
@@ -546,6 +577,7 @@ export default async function BenefitPage({
                     citizenId={citizen.citizenId}
                     entitlementId={entitlement.id}
                     gapId={gap.id}
+                    gapKind={gap.kind}
                     actionPlanId={plan?.id ?? null}
                     actionPlanStatus={plan?.status ?? null}
                     pendingApprovalId={

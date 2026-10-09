@@ -146,14 +146,29 @@ describe("in January, nothing is wrong", () => {
 });
 
 describe("three months later, the monitor notices by itself", () => {
-  it("selects the benefit because instalments fell due unpaid", async () => {
+  it("selects the benefit for a fresh look", async () => {
+    // The schedule only reached January when last audited, so the February
+    // and March instalments do not exist yet to be "overdue". The benefit is
+    // picked up because its audit has gone stale; that audit then extends the
+    // schedule and finds the missing months (asserted below).
+    //
+    // This test used to assert a PAYMENT_MISSED candidate and passed - for the
+    // wrong reason. The overdue query filtered on a relation nothing
+    // populated, so it reported JANUARY, which had been paid.
     const candidates = await findCandidates({ clock: APRIL, citizenId, limit: 25 });
 
-    const missed = candidates.find((c) => c.kind === "PAYMENT_MISSED");
-    expect(missed).toBeDefined();
-    expect(missed?.entitlementId).toBe(entitlementId);
+    const selected = candidates.find((c) => c.entitlementId === entitlementId);
+    expect(selected).toBeDefined();
     // It records WHY, not merely that it looked.
-    expect(missed?.reason).toMatch(/overdue/i);
+    expect(selected?.reason.length).toBeGreaterThan(10);
+  });
+
+  it("never reports a PAID instalment as overdue", async () => {
+    const candidates = await findCandidates({ clock: APRIL, citizenId, limit: 25 });
+    const claims = candidates
+      .filter((c) => c.kind === "PAYMENT_MISSED")
+      .map((c) => c.payload.periodLabel);
+    expect(claims).not.toContain("2026-01");
   });
 
   it("records a monitoring event and re-audits without being asked", async () => {
@@ -287,7 +302,9 @@ describe("a resolved gap stops being reported", () => {
       });
     }
 
-    await runMonitoringTick({ clock: APRIL, citizenId });
+    // Forced, as the demo console's manual pass is: the benefit was audited
+    // moments ago, so a routine pass would rightly skip it.
+    await runMonitoringTick({ clock: APRIL, citizenId, force: true });
 
     const stillMissing = await prisma.benefitGap.count({
       where: { entitlementId, resolvedAt: null, kind: "PAYMENT_MISSED" },

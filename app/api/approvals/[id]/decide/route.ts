@@ -33,6 +33,8 @@ export const POST = handler(
     });
     if (!approval) throw new ApiError("NOT_FOUND", "No such approval.");
 
+    const clock = await currentClock();
+
     if (approval.kind === "APPLICATION_SUBMISSION") {
       return ok(
         await decideApplicationApproval({
@@ -41,11 +43,11 @@ export const POST = handler(
           decision: body.decision,
           edits: body.edits,
           note: body.note,
+          clock,
         }),
       );
     }
 
-    const clock = await currentClock();
     return ok(
       await decideActionApproval({
         citizenId: citizen.citizenId,

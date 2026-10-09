@@ -239,7 +239,7 @@ export default async function DashboardPage() {
                   citizenId={citizen.citizenId}
                   paymentId={action.paymentId ?? ""}
                   schemeName={action.schemeName ?? "this scheme"}
-                  periodLabel={action.prompt.match(/for (\S+)\?$/)?.[1] ?? "this period"}
+                  periodLabel={action.periodLabel ?? "this period"}
                   amountLabel={
                     action.amountPaise
                       ? formatINR(deserialize(action.amountPaise))

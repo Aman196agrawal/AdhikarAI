@@ -43,6 +43,8 @@ export interface PendingAction {
   schemeName?: string;
   approvalId?: string;
   paymentId?: string;
+  /** The payment period in question, as data rather than parsed from prose. */
+  periodLabel?: string;
   /** Amount in question, when there is one. Null is not zero. */
   amountPaise?: string | null;
 }
@@ -279,6 +281,7 @@ export async function buildDashboard(input: {
           benefitId: entitlement.id,
           schemeName: entitlement.scheme.name,
           paymentId: payment.id,
+          periodLabel: payment.periodLabel,
           amountPaise: serialize(payment.reportedAmountPaise),
         });
       }

@@ -52,8 +52,15 @@ export const ACCEPTED_MIME_TYPES = [
   "image/heic",
 ] as const;
 
-/** 12 MB. Large enough for a photographed passbook, small enough to bound memory. */
-export const MAX_UPLOAD_BYTES = 12 * 1024 * 1024;
+/**
+ * 4 MB.
+ *
+ * Bounded by the platform, not by preference: Vercel rejects serverless request
+ * bodies over 4.5 MB before the handler runs, so a larger limit here would
+ * never be reached and the citizen would get the platform's bare error instead
+ * of ours. One phone photo of a passbook page fits comfortably.
+ */
+export const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 /** How far either side of the expected date to look. */
 const WINDOW_BEFORE_DAYS = 15;

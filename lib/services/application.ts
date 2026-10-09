@@ -25,7 +25,7 @@ import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/api/http";
 import { log } from "@/lib/log";
 import { govGateway } from "@/lib/adapters/mockGovGateway";
-import type { Clock } from "@/lib/clock";
+import { systemClock, type Clock } from "@/lib/clock";
 import { loadProfile } from "./profile";
 import { recordAudit, transitionEntitlement, type Actor } from "./transitions";
 import { requireScheme } from "@/lib/registry";
@@ -120,7 +120,7 @@ export async function prepareApplication(input: {
 
   const entitlement = await prisma.entitlement.findFirstOrThrow({
     where: { id: input.entitlementId, citizenId: input.citizenId },
-    include: { scheme: true, application: true },
+    include: { scheme: true, application: { include: { fields: true } } },
   });
 
   if (entitlement.verdict === "RED") {
@@ -135,7 +135,18 @@ export async function prepareApplication(input: {
 
   // Prefill from the profile where a form field maps to a profile attribute.
   const prepared: PreparedField[] = spec.formSchema.map((field) => {
-    const provided = input.providedFields?.[field.key];
+    // Values the citizen typed earlier survive a re-preparation. Previously
+    // calling this again without `providedFields` (the profile changed, or the
+    // page was refreshed) rebuilt the form from the profile alone and silently
+    // discarded the Aadhaar and account numbers they had entered.
+    const previouslyEntered = entitlement.application?.fields.find(
+      (f) => f.key === field.key && f.source === "CITIZEN_EDITED",
+    )?.value;
+    const provided =
+      input.providedFields?.[field.key] ??
+      (previouslyEntered !== undefined && previouslyEntered !== null
+        ? previouslyEntered
+        : undefined);
     const fromProfile =
       field.fromProfileField !== undefined
         ? profile[field.fromProfileField]?.value
@@ -332,6 +343,23 @@ export async function requestApplicationApproval(input: {
     isMockSubmission: govGateway().isMock,
   };
 
+  // Reuse an approval that is still waiting. Opening a new one on every call
+  // left a trail of duplicate PENDING approvals from a double tap or a
+  // refreshed page, each a separate thing the citizen appeared to be asked.
+  const pendingAlready = await prisma.approval.findFirst({
+    where: {
+      kind: "APPLICATION_SUBMISSION",
+      applicationId: application.id,
+      decision: "PENDING",
+    },
+  });
+  if (pendingAlready) {
+    return {
+      approvalId: pendingAlready.id,
+      shownEvidence: pendingAlready.shownEvidence as Record<string, unknown>,
+    };
+  }
+
   const approval = await prisma.approval.create({
     data: {
       kind: "APPLICATION_SUBMISSION",
@@ -366,6 +394,10 @@ export async function decideApplicationApproval(input: {
   /** Fields the citizen corrected before approving. */
   edits?: Record<string, unknown>;
   note?: string;
+  /** When the decision is made. Previously the application's updatedAt was
+   *  recorded instead, which is when it was last edited, not when consent
+   *  was given - wrong in exactly the record that proves consent. */
+  clock?: Clock;
 }): Promise<{ applicationId: string; decision: string }> {
   const approval = await prisma.approval.findFirstOrThrow({
     where: {
@@ -403,7 +435,7 @@ export async function decideApplicationApproval(input: {
     data: {
       decision: input.decision,
       decidedBy: `citizen:${input.citizenId}`,
-      decidedAt: application.updatedAt,
+      decidedAt: (input.clock ?? systemClock()).now(),
       edits: input.edits ? asJson(input.edits) : undefined,
       note: input.note,
     },

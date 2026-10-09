@@ -24,7 +24,7 @@ import {
   govReturnForDocument,
   govStallApplication,
 } from "../lib/adapters/mockGovControl";
-import { fixedClock, type Clock } from "../lib/clock";
+import { fixedClock, realNow, type Clock } from "../lib/clock";
 import { prisma } from "../lib/db";
 import { formatINR, paise, rupees } from "../lib/engine/money";
 import { auditBenefit } from "../lib/services/audit";
@@ -595,6 +595,33 @@ async function registerPersonas(): Promise<void> {
   }
 }
 
+/**
+ * Pin the app's clock to the world this seed built.
+ *
+ * Every record above is dated as of TODAY (15 June 2026). Without this, the
+ * running app used the real date - months later - and the first audit any
+ * click triggered found every instalment since June "missing", so the
+ * dashboard changed under the presenter mid-demo. The offset makes the app's
+ * "now" match the seed's, and the dashboard shows a DEMO CLOCK badge so the
+ * shifted date is never passed off as the real one.
+ */
+async function pinDemoClock(): Promise<void> {
+  const diffMs = TODAY.getTime() - realNow().getTime();
+  const offsetDays = Math.trunc(diffMs / 86_400_000);
+  const offsetMinutes = Math.round((diffMs - offsetDays * 86_400_000) / 60_000);
+
+  await prisma.demoClock.upsert({
+    where: { id: "singleton" },
+    create: { id: "singleton", offsetDays, offsetMinutes },
+    update: { offsetDays, offsetMinutes },
+  });
+
+  console.log(
+    `
+Demo clock pinned to ${TODAY.toISOString().slice(0, 10)} (offset ${offsetDays} days). The demo console's clock controls move it from there.`,
+  );
+}
+
 async function summarise(): Promise<void> {
   const ledgers = await prisma.benefitLedger.findMany();
   const totals = ledgers.reduce(
@@ -630,8 +657,20 @@ async function main(): Promise<void> {
     return;
   }
 
+  // Demo data belongs in demo environments only. Without this guard, running
+  // the demo seed against a real deployment would add fake citizens to it.
+  if ((process.env.DEMO_MODE ?? "").toLowerCase() !== "true") {
+    console.error(
+      "Refusing to seed demo citizens: DEMO_MODE is not \"true\". Demo data must not be added to an environment holding real citizens.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   console.log("Clearing existing demo citizens...");
-  await prisma.auditLog.deleteMany({});
+  // Scoped to demo citizens. This used to delete the ENTIRE audit log, which
+  // in any environment with real users would have erased their trail.
+  await prisma.auditLog.deleteMany({ where: { citizen: { isDemo: true } } });
   await prisma.citizen.deleteMany({ where: { isDemo: true } });
   await prisma.govDisbursement.deleteMany({});
   await prisma.govStatusEvent.deleteMany({});
@@ -641,6 +680,7 @@ async function main(): Promise<void> {
   await buildRamesh();
   await buildSunita();
   await registerPersonas();
+  await pinDemoClock();
   await summarise();
 }
 

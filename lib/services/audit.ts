@@ -27,12 +27,15 @@ import { detectGaps, type DetectedGap } from "@/lib/engine/gaps";
 import { reconcile, type ReconcileResult } from "@/lib/engine/reconciler";
 import { projectLedger } from "@/lib/engine/ledger";
 import {
+  CONSENT_AND_ACTION_STATES,
   EXCEPTION_STATES,
+  RECOVERY_IN_PROGRESS_STATES,
   pathTo,
   stateForReceipt,
 } from "@/lib/engine/stateMachine";
 import { generateSchedule, periodLabel } from "@/lib/engine/period";
 import { log } from "@/lib/log";
+import { expectedForPayment } from "./expected";
 import type {
   AuditDecision,
   ApplicationStatus,
@@ -126,11 +129,6 @@ export async function auditBenefit(input: {
     },
   });
 
-  const citizen = await prisma.citizen.findUniqueOrThrow({
-    where: { id: input.citizenId },
-    select: { aadhaarLast4: true },
-  });
-
   const gateway = govGateway();
   const findings: AuditResult["findings"] = [];
 
@@ -139,14 +137,16 @@ export async function auditBenefit(input: {
   // -------------------------------------------------------------------------
   const applicationRef = entitlement.application?.govApplicationRef ?? null;
 
+  // Look the government side up by OUR application reference only.
+  //
+  // This previously fell back to searching by scheme and the last four digits
+  // of Aadhaar. Four digits identify one person in ten thousand, so in any real
+  // caseload that fallback would attach another citizen's application - and
+  // their disbursements - to this benefit. A benefit we never lodged has no
+  // government record we can soundly claim.
   const govStatus = applicationRef
     ? await gateway.getApplicationStatus(applicationRef)
-    : citizen.aadhaarLast4
-      ? await gateway.findApplication({
-          schemeCode: entitlement.scheme.code,
-          aadhaarLast4: citizen.aadhaarLast4,
-        })
-      : null;
+    : null;
 
   let applicationStatus: ApplicationStatus | null =
     entitlement.application?.status ?? null;
@@ -215,12 +215,9 @@ export async function auditBenefit(input: {
   // -------------------------------------------------------------------------
   // 3 & 4. Payment and receipt
   // -------------------------------------------------------------------------
-  const disbursements = citizen.aadhaarLast4
-    ? await gateway.listDisbursements({
-        schemeCode: entitlement.scheme.code,
-        aadhaarLast4: citizen.aadhaarLast4,
-        ...(applicationRef ? { applicationRef } : {}),
-      })
+  // Same rule: disbursements are only ever read against our own reference.
+  const disbursements = applicationRef
+    ? await gateway.listDisbursements({ applicationRef })
     : [];
 
   const expectedPerInstalment =
@@ -229,6 +226,10 @@ export async function auditBenefit(input: {
       : paise(entitlement.expectedAmountPaise);
 
   const reconciliations: ReconcileResult[] = [];
+  const periodReconciliations: Array<{
+    periodLabel: string;
+    result: ReconcileResult;
+  }> = [];
   const actualPayments: ActualPaymentRecord[] = [];
 
   for (const disbursement of disbursements) {
@@ -240,7 +241,15 @@ export async function auditBenefit(input: {
     const latestVerification = existing?.verifications[0] ?? null;
 
     const reconciliation = reconcile({
-      expectedAmount: expectedPerInstalment,
+      // A staged benefit is reconciled stage by stage. Comparing one stage
+      // against the full entitlement reported the not-yet-due remainder as
+      // proven missing money.
+      expectedAmount: expectedForPayment({
+        schemeCode: entitlement.scheme.code,
+        entitlementExpected: entitlement.expectedAmountPaise,
+        reportedAmount: disbursement.amountPaise,
+        released: disbursement.status === "RELEASED",
+      }),
       // A FAILED or RETURNED disbursement never left, so it is not reported
       // as released.
       governmentReportedAmount:
@@ -260,6 +269,10 @@ export async function auditBenefit(input: {
     });
 
     reconciliations.push(reconciliation);
+    periodReconciliations.push({
+      periodLabel: disbursement.periodLabel,
+      result: reconciliation,
+    });
 
     // Explicit create-or-update rather than an upsert: (entitlement, period)
     // has no unique constraint, because a scheme can legitimately release more
@@ -290,12 +303,17 @@ export async function auditBenefit(input: {
       });
     }
 
-    actualPayments.push({
-      periodLabel: disbursement.periodLabel,
-      receiptState: reconciliation.receiptState,
-      reportedAmount: paise(disbursement.amountPaise),
-      reportedOn: disbursement.releasedOn,
-    });
+    // Only a RELEASED disbursement satisfies a period for continuity. A FAILED
+    // or RETURNED one never left the treasury; counting it as paid made the
+    // month look covered while nothing was sent and nothing was reconciled.
+    if (disbursement.status === "RELEASED") {
+      actualPayments.push({
+        periodLabel: disbursement.periodLabel,
+        receiptState: reconciliation.receiptState,
+        reportedAmount: paise(disbursement.amountPaise),
+        reportedOn: disbursement.releasedOn,
+      });
+    }
 
     findings.push({
       area: "PAYMENT",
@@ -404,18 +422,15 @@ export async function auditBenefit(input: {
     .filter((d) => !d.provided)
     .map((d) => d.kind as string);
 
-  const latestReconciliation =
-    reconciliations.length > 0
-      ? reconciliations[reconciliations.length - 1]
-      : null;
-
   const detection = detectGaps({
     verdict: entitlement.verdict,
     applicationStatus,
     daysSinceSubmission,
     rejectionReason,
     missingDocuments,
-    reconciliation: latestReconciliation,
+    // Every period, not only the latest: a new month's unconfirmed payment
+    // must not hide last month's proven discrepancy.
+    periodReconciliations,
     continuityGaps: continuity.gaps,
   });
 
@@ -514,10 +529,20 @@ export async function auditBenefit(input: {
     });
   }
 
+  // Carry forward what has already been recovered. Without this every audit
+  // recomputed recovery status from zero, so the first monitoring pass after a
+  // recovery reset RESOLVED back to NOT_APPLICABLE and the dashboard's
+  // "recovered" count quietly dropped the case.
+  const previousLedger = await prisma.benefitLedger.findUnique({
+    where: { entitlementId: entitlement.id },
+    select: { recoveredAmountPaise: true },
+  });
+
   const ledger = projectLedger({
     expectedAmount: expectedPerInstalment,
     applicationStatus,
     payments: reconciliations,
+    recoveredAmount: paise(previousLedger?.recoveredAmountPaise ?? 0n),
     appliedAt: entitlement.application?.submittedAt ?? null,
     lastAuditAt: now,
   });
@@ -560,21 +585,36 @@ export async function auditBenefit(input: {
           ? "APPROVED"
           : null;
 
-  if (target && (input.manageLifecycle ?? true)) {
+  const recoveryOwnsIt = RECOVERY_IN_PROGRESS_STATES.includes(
+    entitlement.lifecycleState,
+  );
+
+  if (target && (input.manageLifecycle ?? true) && recoveryOwnsIt) {
+    // The recovery loop owns this benefit right now. The audit's facts are
+    // recorded above; moving the state would pull the case away from a plan
+    // awaiting the citizen's approval or an action being checked.
+    log.info("audit.lifecycle_deferred_to_recovery", {
+      entitlementId: entitlement.id,
+      state: entitlement.lifecycleState,
+    });
+  } else if (target && (input.manageLifecycle ?? true)) {
     // An audit routinely learns several things at once: that the application
     // was approved, that a payment was then released, and that nobody has
     // confirmed receipt. Walking the path records each of those rather than
     // jumping to the last one, so the trail shows a benefit that was approved
     // and disbursed instead of one that teleported into "unverified".
     const path = pathTo(entitlement.lifecycleState, target, {
-      avoid: EXCEPTION_STATES,
+      // An audit observes; it never records a consent or an action. Routing
+      // through those states would write a trail entry claiming the citizen
+      // approved something, or that an action ran, when neither happened.
+      avoid: [...EXCEPTION_STATES, ...CONSENT_AND_ACTION_STATES],
     });
 
     if (path.length === 0 && entitlement.lifecycleState !== target) {
       // Genuinely unreachable: the audit reached a conclusion the workflow
       // cannot express from where this benefit sits. A real inconsistency, so
       // it is logged loudly - but it must not discard the audit just computed.
-      log.error("audit.unreachable_state", {
+      log.warn("audit.unreachable_state", {
         entitlementId: entitlement.id,
         from: entitlement.lifecycleState,
         to: target,

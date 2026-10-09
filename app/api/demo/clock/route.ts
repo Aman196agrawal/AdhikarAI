@@ -54,7 +54,9 @@ export const POST = handler("POST /api/demo/clock", async (request) => {
   const clock = await currentClock();
 
   const monitoring = body.runMonitoring
-    ? await runMonitoringTick({ clock, citizenId: body.citizenId })
+    ? // Forced: a pass the presenter asked for should always look, rather
+      // than being skipped because the benefit was checked minutes ago.
+      await runMonitoringTick({ clock, citizenId: body.citizenId, force: true })
     : null;
 
   return ok({

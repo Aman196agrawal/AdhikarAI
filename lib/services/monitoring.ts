@@ -34,6 +34,17 @@ const RE_AUDIT_AFTER_DAYS = 7;
 /** Grace period before an unpaid due instalment is treated as newsworthy. */
 const PAYMENT_GRACE_DAYS = 15;
 
+/**
+ * Minimum gap between routine re-audits of the same benefit.
+ *
+ * Without it, every benefit with an open problem - including an unclaimed one
+ * that will stay open until the citizen applies - was re-audited every five
+ * minutes for ever, writing a MonitoringEvent each time: 288 rows a day per
+ * benefit, all saying nothing new. Benefits pay monthly; checking each one a
+ * few times a day loses nothing.
+ */
+const MIN_RECHECK_HOURS = 6;
+
 /** Lifecycle states that are settled enough not to need routine re-auditing. */
 const DORMANT_STATES = ["DISCOVERED", "POTENTIAL_ENTITLEMENT"] as const;
 
@@ -73,6 +84,8 @@ export async function findCandidates(input: {
   clock: Clock;
   citizenId?: string;
   limit: number;
+  /** Ignore the re-check throttle. Used by the demo console's manual pass. */
+  force?: boolean;
 }): Promise<MonitoringCandidate[]> {
   const now = input.clock.now();
   const candidates: MonitoringCandidate[] = [];
@@ -80,7 +93,21 @@ export async function findCandidates(input: {
 
   const scope = input.citizenId ? { citizenId: input.citizenId } : {};
 
+  // Benefits audited recently enough that another look would add nothing.
+  const recentlyAudited = new Set<string>();
+  if (!input.force) {
+    const recent = await prisma.benefitLedger.findMany({
+      where: {
+        entitlement: scope,
+        lastAuditAt: { gt: new Date(now.getTime() - MIN_RECHECK_HOURS * 3_600_000) },
+      },
+      select: { entitlementId: true },
+    });
+    for (const row of recent) recentlyAudited.add(row.entitlementId);
+  }
+
   const add = (candidate: MonitoringCandidate): void => {
+    if (recentlyAudited.has(candidate.entitlementId)) return;
     if (seen.has(candidate.entitlementId)) return;
     seen.add(candidate.entitlementId);
     candidates.push(candidate);
@@ -88,16 +115,37 @@ export async function findCandidates(input: {
 
   // 1. An expected instalment is due, past grace, with no payment recorded.
   //    This is the continuity case and the highest-value signal.
-  const overdue = await prisma.expectedPayment.findMany({
+  //
+  //    Matched to payments by period. This used to filter on the
+  //    ExpectedPayment -> Payment relation, which nothing ever populates, so
+  //    every past instalment looked unpaid for ever: paid benefits were
+  //    re-audited on every pass, and the event log claimed "nothing recorded"
+  //    for months that had been paid.
+  const overdueRaw = await prisma.expectedPayment.findMany({
     where: {
       dueOn: { lte: new Date(now.getTime() - PAYMENT_GRACE_DAYS * MS_PER_DAY) },
-      payment: null,
       entitlement: scope,
     },
-    include: { entitlement: { include: { scheme: { select: { code: true } } } } },
+    include: {
+      entitlement: {
+        include: {
+          scheme: { select: { code: true } },
+          payments: { select: { periodLabel: true, receiptState: true } },
+        },
+      },
+    },
     orderBy: { dueOn: "asc" },
-    take: input.limit,
+    // Over-fetch: most past instalments are paid and are filtered out below.
+    take: input.limit * 20,
   });
+
+  const overdue = overdueRaw.filter(
+    (row) =>
+      !row.entitlement.payments.some(
+        // A disbursement that never left (NOT_DISBURSED) does not count.
+        (p) => p.periodLabel === row.periodLabel && p.receiptState !== "NOT_DISBURSED",
+      ),
+  );
 
   for (const row of overdue) {
     const overdueDays = Math.round(
@@ -200,6 +248,8 @@ export async function runMonitoringTick(input: {
   clock: Clock;
   citizenId?: string;
   batchSize?: number;
+  /** Skip the re-check throttle (the demo console's manual pass). */
+  force?: boolean;
 }): Promise<TickResult> {
   const batchSize = input.batchSize ?? 25;
   const now = input.clock.now();
@@ -209,6 +259,7 @@ export async function runMonitoringTick(input: {
     clock: input.clock,
     citizenId: input.citizenId,
     limit: batchSize + 1,
+    force: input.force,
   });
 
   const batch = candidates.slice(0, batchSize);

@@ -218,6 +218,40 @@ export const EXCEPTION_STATES: readonly LifecycleState[] = [
   "MONITORING",
 ];
 
+/**
+ * States that record a HUMAN or AGENT act: a consent gate, or a corrective
+ * action being planned or carried out.
+ *
+ * An audit only observes. It must never walk a benefit through one of these,
+ * because doing so would write an audit-trail entry asserting that a citizen
+ * approved something, or that an action was executed, when neither happened.
+ * Found while reviewing: an application lodged outside this system would
+ * otherwise have been routed through AWAITING_APPLICATION_APPROVAL.
+ */
+export const CONSENT_AND_ACTION_STATES: readonly LifecycleState[] = [
+  "APPLICATION_DRAFT",
+  "AWAITING_APPLICATION_APPROVAL",
+  "ACTION_PLANNED",
+  "AWAITING_ACTION_APPROVAL",
+  "ACTION_EXECUTED",
+  "REVERIFYING",
+];
+
+/**
+ * States in which the recovery loop owns the benefit.
+ *
+ * A routine audit (from the monitor, say) must not move a benefit out of these:
+ * it would yank a case away from a plan awaiting the citizen's approval, or
+ * from an action whose result is being checked.
+ */
+export const RECOVERY_IN_PROGRESS_STATES: readonly LifecycleState[] = [
+  "ROOT_CAUSE_IDENTIFIED",
+  "ACTION_PLANNED",
+  "AWAITING_ACTION_APPROVAL",
+  "ACTION_EXECUTED",
+  "REVERIFYING",
+];
+
 /** Every state reachable from `start`, by breadth-first search. */
 export function reachableStates(start: LifecycleState): Set<LifecycleState> {
   const seen = new Set<LifecycleState>();

@@ -24,10 +24,11 @@ import { prisma } from "@/lib/db";
 import type { Clock } from "@/lib/clock";
 import { paise, type Paise } from "@/lib/engine/money";
 import { reconcile } from "@/lib/engine/reconciler";
-import { stateForReceipt } from "@/lib/engine/stateMachine";
 import { log } from "@/lib/log";
 import type { CitizenReport } from "@/lib/generated/prisma/enums";
-import { recordAudit, transitionEntitlement, type Actor } from "./transitions";
+import { auditBenefit } from "./audit";
+import { expectedForPayment } from "./expected";
+import { recordAudit, type Actor } from "./transitions";
 
 export interface ConfirmReceiptResult {
   paymentId: string;
@@ -70,10 +71,11 @@ export async function confirmReceipt(input: {
     },
   });
 
-  const expected =
-    payment.entitlement.expectedAmountPaise === null
-      ? null
-      : paise(payment.entitlement.expectedAmountPaise);
+  const expected = expectedForPayment({
+    schemeCode: payment.entitlement.scheme.code,
+    entitlementExpected: payment.entitlement.expectedAmountPaise,
+    reportedAmount: payment.reportedAmountPaise,
+  });
 
   // Any existing evidence stands; the citizen's answer is added to it rather
   // than replacing it. Bank evidence that already matched is not overturned
@@ -122,17 +124,6 @@ export async function confirmReceipt(input: {
     },
   });
 
-  await prisma.benefitLedger.updateMany({
-    where: { entitlementId: payment.entitlementId },
-    data: {
-      receiptState: result.receiptState,
-      gapAmountPaise: result.gapAmount,
-      unverifiedAmountPaise: result.unverifiedAmount,
-      receivedAmountPaise: result.receivedAmount,
-      lastVerifiedAt: now,
-    },
-  });
-
   await recordAudit(prisma, {
     citizenId: input.citizenId,
     actor,
@@ -142,28 +133,22 @@ export async function confirmReceipt(input: {
     reason: `The citizen answered "${input.answer}" about the ${payment.periodLabel} payment. ${result.reasons[0] ?? ""}`.trim(),
   });
 
-  // Move the benefit to match the new receipt state, where that is a legal
-  // move. A discrepancy will be picked up as a gap by the next audit.
-  const target = stateForReceipt(result.receiptState);
-  try {
-    await transitionEntitlement(prisma, {
-      entitlementId: payment.entitlementId,
-      citizenId: input.citizenId,
-      to: target,
-      actor,
-      reason: result.reasons.join(" "),
-      evidenceRef: payment.id,
-    });
-  } catch {
-    // The benefit is somewhere the receipt state cannot be expressed from,
-    // such as mid-recovery. The verification is still recorded, and the next
-    // audit will reconcile the lifecycle. Swallowed deliberately: the
-    // citizen's answer must never be lost to a workflow technicality.
-    log.info("receipt.transition_skipped", {
-      paymentId: payment.id,
-      to: target,
-    });
-  }
+  // Re-audit the whole benefit with the new answer in hand.
+  //
+  // This used to write THIS payment's figures straight into the benefit's
+  // ledger, overwriting the totals for every other period. On a monthly
+  // pension, answering "yes" for April set "received" to April's amount alone
+  // and "did not arrive" to zero - erasing May's proven-missing payment from
+  // the citizen's screen. Re-auditing recomputes every period, preserves what
+  // has been recovered, and opens (or closes) the gap immediately rather than
+  // waiting for the next monitoring pass. It also moves the lifecycle, and
+  // defers to the recovery loop if that currently owns the benefit.
+  await auditBenefit({
+    citizenId: input.citizenId,
+    entitlementId: payment.entitlementId,
+    clock: input.clock,
+    actor,
+  });
 
   log.info("receipt.confirmed", {
     paymentId: payment.id,

@@ -12,6 +12,11 @@ npm run db:up && npm run seed:all && npm run dev
 Open two tabs: `http://localhost:3000` and `http://localhost:3000/demo`.
 Check `DEMO_MODE=true` in `.env`.
 
+**Re-seed immediately before presenting.** `seed:demo` builds the world as of
+15 June 2026 and pins the app's clock there. Anything you click during a
+rehearsal changes the data, and the console's "Jump to the real date" moves
+months ahead. `npm run seed:demo` puts everything back exactly.
+
 ---
 
 ## 0 · The opening line (20s)

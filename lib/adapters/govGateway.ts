@@ -114,6 +114,8 @@ export interface CorrectInformationInput extends GovCitizenRef {
   /** Which fields to correct, and to what. */
   corrections: Record<string, unknown>;
   reason: string;
+  /** When the correction is made. Supplied, never read from the record. */
+  requestedAt: Date;
 }
 
 export interface SubmitDocumentInput extends GovCitizenRef {
@@ -122,6 +124,8 @@ export interface SubmitDocumentInput extends GovCitizenRef {
   documentKind: string;
   /** Hash only. Document bytes never cross this boundary. */
   documentSha256: string;
+  /** When the document is supplied. */
+  requestedAt: Date;
 }
 
 export type GovOperationResult =
@@ -152,14 +156,15 @@ export interface GovGateway {
     applicationRef: string,
   ): Promise<GovApplicationStatusResult | null>;
 
-  /** Find an application the citizen may already have, outside our records. */
-  findApplication(
-    ref: GovCitizenRef,
-  ): Promise<GovApplicationStatusResult | null>;
-
-  listDisbursements(
-    ref: GovCitizenRef & { applicationRef?: string },
-  ): Promise<GovDisbursementRecord[]>;
+  /**
+   * Disbursements recorded against one of OUR applications.
+   *
+   * Deliberately keyed by application reference only. An earlier version also
+   * offered lookups by scheme and the last four digits of Aadhaar; four digits
+   * identify one person in ten thousand, so in any real caseload that would
+   * have attached another citizen's payments to this one.
+   */
+  listDisbursements(ref: { applicationRef: string }): Promise<GovDisbursementRecord[]>;
 
   correctInformation(input: CorrectInformationInput): Promise<GovOperationResult>;
 

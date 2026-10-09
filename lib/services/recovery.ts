@@ -506,10 +506,39 @@ export async function executeActionPlan(input: {
   });
   const aadhaarLast4 = citizen.aadhaarLast4 ?? "0000";
 
-  await prisma.actionPlan.update({
-    where: { id: plan.id },
+  // Already carried out: report what happened rather than doing it again.
+  if (plan.status === "EXECUTED") {
+    return {
+      actionPlanId: plan.id,
+      executed: plan.steps.map((step) => {
+        const run = plan.executions.find((e) => e.stepId === step.id);
+        return {
+          position: step.position,
+          kind: step.kind,
+          status: run?.status ?? "SUCCEEDED",
+          message: "Already completed; not run again.",
+        };
+      }),
+      allSucceeded: plan.executions.every((e) => e.status === "SUCCEEDED"),
+    };
+  }
+
+  // Claim the plan atomically. Two concurrent requests - a double-tap on a slow
+  // phone is enough - would otherwise both pass the approval check above and
+  // both file the grievance. Only the request that moves the plan out of
+  // APPROVED (or FAILED, for a retry) gets to run it; a SUPERSEDED plan can
+  // never be claimed, even though its old approval still reads APPROVED.
+  const claimed = await prisma.actionPlan.updateMany({
+    where: { id: plan.id, status: { in: ["APPROVED", "FAILED"] } },
     data: { status: "EXECUTING" },
   });
+
+  if (claimed.count === 0) {
+    throw new ApiError(
+      "CONFLICT",
+      `This plan cannot be carried out now (it is ${plan.status.toLowerCase()}).`,
+    );
+  }
 
   const executed: ExecutionOutcome["executed"] = [];
 
@@ -650,6 +679,7 @@ async function runStep(input: {
           input.informationRequired.map((field) => [field, "corrected"]),
         ),
         reason: input.planSummary,
+        requestedAt: input.clock.now(),
       });
       return result.ok
         ? {
@@ -818,6 +848,17 @@ export async function reverifyBenefit(input: {
   });
   const gapBefore = before ? paise(before.gapAmountPaise) : ZERO;
 
+  // The gap the corrective action was FOR: the newest open gap with a plan
+  // that has been carried out. Re-verification answers whether THAT was fixed.
+  const targetGap = await prisma.benefitGap.findFirst({
+    where: {
+      entitlementId: input.entitlementId,
+      resolvedAt: null,
+      actionPlans: { some: { status: { in: ["EXECUTED", "FAILED"] } } },
+    },
+    orderBy: { detectedAt: "desc" },
+  });
+
   await transitionEntitlement(prisma, {
     entitlementId: input.entitlementId,
     citizenId: input.citizenId,
@@ -844,20 +885,40 @@ export async function reverifyBenefit(input: {
   });
   const gapAfter = after ? paise(after.gapAmountPaise) : ZERO;
 
-  const resolved = audit.decision === "HEALTHY" || gapAfter < gapBefore;
-  const recoveredAmount = gapBefore > gapAfter ? paise(gapBefore - gapAfter) : ZERO;
+  // Resolved means the targeted gap is no longer detected. The audit has
+  // already closed every gap it no longer finds, and left open every gap it
+  // still finds.
+  //
+  // This previously marked ALL open gaps on the benefit resolved whenever the
+  // ledger total went down. Recovering May's payment would therefore also
+  // "resolve" a separate, still-missing March - erasing a real problem from
+  // the citizen's screen.
+  const targetAfter = targetGap
+    ? await prisma.benefitGap.findUnique({
+        where: { id: targetGap.id },
+        select: { resolvedAt: true },
+      })
+    : null;
+
+  const resolved = targetGap
+    ? targetAfter?.resolvedAt != null
+    : audit.decision === "HEALTHY";
+
+  const recoveredAmount = !resolved
+    ? ZERO
+    : targetGap?.amountPaise != null
+      ? paise(targetGap.amountPaise)
+      : gapBefore > gapAfter
+        ? paise(gapBefore - gapAfter)
+        : ZERO;
 
   if (resolved) {
-    await prisma.benefitGap.updateMany({
-      where: { entitlementId: input.entitlementId, resolvedAt: null },
-      data: { resolvedAt: input.clock.now() },
-    });
-
     await prisma.benefitLedger.update({
       where: { entitlementId: input.entitlementId },
       data: {
         recoveredAmountPaise: { increment: recoveredAmount },
-        recoveryStatus: "RESOLVED",
+        // Fully resolved only when nothing else is still missing.
+        recoveryStatus: gapAfter === ZERO ? "RESOLVED" : "IN_PROGRESS",
         lastVerifiedAt: input.clock.now(),
       },
     });

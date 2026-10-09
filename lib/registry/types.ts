@@ -188,6 +188,18 @@ export interface SchemeSpec {
   frequency: BenefitFrequency;
   durationMonths?: number;
   installmentsPerYear?: number;
+  /**
+   * True when the benefit amount is paid out in several unequal stages
+   * (PMMVY: 1,000 then 2,000 then 2,000; PMAY-G: tied to construction
+   * milestones).
+   *
+   * Without this, the first stage was reconciled against the WHOLE amount,
+   * and the remainder - not yet due - was reported as proven missing money.
+   * For a staged benefit each disbursement is reconciled against what the
+   * government says that stage was, so a shortfall can only be established
+   * by the citizen or by evidence, never by arithmetic against the total.
+   */
+  paidInStages?: boolean;
 
   applicationMethod: string;
   applicationUrl?: string;

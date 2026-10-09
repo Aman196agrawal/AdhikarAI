@@ -17,6 +17,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import { nextStep } from "@/lib/ui/nextStep";
 import { buttonClass } from "./ui";
 
 interface Props {
@@ -27,62 +28,9 @@ interface Props {
   actionPlanStatus: string | null;
   /** The pending approval for the current plan, when there is one. */
   pendingApprovalId: string | null;
+  /** Which kind of problem this is; not every kind has a corrective action. */
+  gapKind: string;
   lifecycleState: string;
-}
-
-type Step =
-  | { kind: "diagnose"; label: string; hint: string }
-  | { kind: "approve"; label: string; hint: string }
-  | { kind: "execute"; label: string; hint: string }
-  | { kind: "reverify"; label: string; hint: string }
-  | { kind: "none" };
-
-function nextStep(props: Props): Step {
-  if (props.actionPlanId === null) {
-    return {
-      kind: "diagnose",
-      label: "Work out what went wrong",
-      hint: "We will look at the evidence and propose what to do. Nothing is sent yet.",
-    };
-  }
-
-  if (props.actionPlanStatus === "AWAITING_APPROVAL") {
-    return {
-      kind: "approve",
-      label: "Review what we propose",
-      hint: "You decide whether we go ahead.",
-    };
-  }
-
-  if (props.actionPlanStatus === "APPROVED") {
-    return {
-      kind: "execute",
-      label: "Carry out the approved steps",
-      hint: "You approved this. We will do it now and then check whether it worked.",
-    };
-  }
-
-  if (
-    props.actionPlanStatus === "EXECUTED" ||
-    props.actionPlanStatus === "FAILED" ||
-    props.lifecycleState === "ACTION_EXECUTED"
-  ) {
-    return {
-      kind: "reverify",
-      label: "Check whether it actually worked",
-      hint: "We do not assume it did. We re-read the government record and compare.",
-    };
-  }
-
-  if (props.lifecycleState === "RE_AUDIT_REQUIRED") {
-    return {
-      kind: "diagnose",
-      label: "Work it out again",
-      hint: "That did not fix it. We will diagnose again, knowing what has already been tried.",
-    };
-  }
-
-  return { kind: "none" };
 }
 
 export function BenefitActions(props: Props) {

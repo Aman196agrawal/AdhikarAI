@@ -203,16 +203,22 @@ export function DemoConsole({
             type="button"
             disabled={busy !== null || pending}
             onClick={() =>
-              void call("Reset the clock", "/api/demo/clock", { action: "RESET" })
+              void call("Jumped to the real date", "/api/demo/clock", { action: "RESET" })
             }
             className={buttonClass.secondary}
           >
-            Reset
+            Jump to the real date
           </button>
         </div>
         <p className="mt-2 text-xs text-subtle">
           Advancing also runs a monitoring pass, which is what a real
           five-minute cron would have done over that period.
+        </p>
+        <p className="mt-1 text-xs text-[var(--warn)]">
+          The demo data is set in mid-June 2026. Jumping to the real date moves
+          months ahead in one step, and the monitor will then correctly report
+          every instalment since June as missing. To return to the start,
+          re-run <code>npm run seed:demo</code>.
         </p>
       </section>
 

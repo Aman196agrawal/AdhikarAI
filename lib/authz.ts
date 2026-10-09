@@ -17,6 +17,8 @@
  * query freely, that change would have meant auditing every handler.
  */
 
+import { timingSafeEqual } from "node:crypto";
+
 import { prisma } from "@/lib/db";
 import { ApiError } from "@/lib/api/http";
 
@@ -102,7 +104,13 @@ export function requireCronSecret(request: Request): void {
   const header = request.headers.get("authorization") ?? "";
   const provided = header.replace(/^Bearer\s+/i, "").trim();
 
-  if (provided === "" || provided !== expected) {
+  // Constant-time comparison: `!==` returns as soon as a character differs,
+  // which leaks how much of a guess was right to anyone timing the response.
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  const matches = a.length === b.length && timingSafeEqual(a, b);
+
+  if (provided === "" || !matches) {
     throw new ApiError("UNAUTHORIZED", "Invalid or missing cron credentials.");
   }
 }

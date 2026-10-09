@@ -548,6 +548,7 @@ const PMAY_G: SchemeSpec = {
   benefitNote:
     "₹1,20,000 in plain areas and ₹1,30,000 in hilly, difficult and Integrated Action Plan districts. Released in instalments tied to verified construction milestones, so the schedule is milestone-driven rather than calendar-driven.",
   frequency: "ONE_TIME",
+  paidInStages: true,
   applicationMethod:
     "Identification through the Awaas+ survey and Gram Sabha verification; application supported by the Block Development Office.",
   applicationUrl: "https://pmayg.nic.in/",
@@ -738,6 +739,7 @@ const PMMVY: SchemeSpec = {
   benefitNote:
     "₹5,000 total, in three instalments of ₹1,000, ₹2,000 and ₹2,000. Since 1 April 2022 the benefit is also available for a second child if that child is a girl.",
   frequency: "ONE_TIME",
+  paidInStages: true,
   applicationMethod:
     "Registration through the Anganwadi Centre or approved health facility, or self-registration on the PMMVY portal.",
   applicationUrl: "https://pmmvy.wcd.gov.in/",

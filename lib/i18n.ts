@@ -135,7 +135,7 @@ const STRINGS = {
     "We do not keep the document, your balance, your account number, or any other transaction on the page.",
   "bank.choose": "Choose a file",
   "bank.checking": "Checking…",
-  "bank.limits": "PDF or photo, up to 12 MB. One page showing the payment is enough.",
+  "bank.limits": "PDF or photo, up to 4 MB. One page showing the payment is enough.",
 } as const;
 
 export type StringKey = keyof typeof STRINGS;
@@ -242,7 +242,7 @@ const HINDI: Record<StringKey, string> = {
   "bank.choose": "फ़ाइल चुनें",
   "bank.checking": "जाँचा जा रहा है…",
   "bank.limits":
-    "PDF या फ़ोटो, 12 MB तक। जिस पन्ने पर भुगतान दिख रहा है, वही काफ़ी है।",
+    "PDF या फ़ोटो, 4 MB तक। जिस पन्ने पर भुगतान दिख रहा है, वही काफ़ी है।",
 };
 
 const TABLES: Record<Locale, Record<StringKey, string>> = {
