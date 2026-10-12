@@ -8,9 +8,10 @@
  *
  * DETAIL is PROVISIONAL. Its field names come from an open-source client of
  * the site and have not yet been checked against a captured response. It is
- * parsed tolerantly - every field optional, rich text flattened - and the raw
- * payload is always kept in the snapshot, so nothing is lost if a name is
- * wrong; a mismatch shows up as empty texts, never as a crash or a guess.
+ * parsed tolerantly - every field optional, rich text flattened - and a
+ * response with no recognisable content returns null, which makes the sync
+ * keep the texts it already had. A wrong field name shows up as missing
+ * text, never as a crash, a guess, or erased data.
  *
  * Both parsers are lenient about extra fields (sources add them) and strict
  * about the few fields the sync cannot work without.

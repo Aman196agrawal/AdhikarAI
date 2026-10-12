@@ -14,12 +14,16 @@
 
 import Link from "next/link";
 
+import { matchCatalogue } from "@/lib/catalogue/match";
+import { systemClock } from "@/lib/clock";
 import { deserialize, formatINR } from "@/lib/engine/money";
 import { translator } from "@/lib/i18n";
 import { resolveLocale } from "@/lib/locale";
 import { buildDashboard, type BenefitCard } from "@/lib/services/dashboard";
 import { currentClock } from "@/lib/services/clock";
+import { loadProfile } from "@/lib/services/profile";
 import { requireSelectedCitizen } from "@/lib/session";
+import { CatalogueMatchList } from "@/components/CatalogueMatchList";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ReceiptAnswer } from "@/components/ReceiptAnswer";
 import {
@@ -182,6 +186,13 @@ export default async function DashboardPage() {
   const t = translator(locale);
   const clock = await currentClock();
   const data = await buildDashboard({ citizenId: citizen.citizenId, clock });
+  // The wider catalogue, beyond the tracked benefits. Real time, not the demo
+  // clock: a scheme's closing date is a fact about the world.
+  const catalogue = await matchCatalogue({
+    profile: await loadProfile(citizen.citizenId),
+    clock: systemClock(),
+    limit: 3,
+  });
 
   const groups = groupBenefits(data.benefits);
   const receiptActions = data.pendingActions.filter(
@@ -437,6 +448,29 @@ export default async function DashboardPage() {
           </EmptyState>
         ) : null}
       </section>
+
+      {/* ---------------------------------------- the wider scheme catalogue */}
+      {catalogue.total > 0 ? (
+        <section className="mt-10">
+          <SectionHeading hint={t("catalogue.hint")}>
+            {t("catalogue.heading")} ({catalogue.total})
+          </SectionHeading>
+          <CatalogueMatchList
+            matches={catalogue.matches}
+            locale={locale}
+            labels={{
+              possible: t("catalogue.possible"),
+              meantFor: t("catalogue.meantFor"),
+              toConfirm: t("catalogue.toConfirm"),
+              official: t("catalogue.official"),
+              closes: t("catalogue.closes"),
+            }}
+          />
+          <Link href="/schemes" className={`${buttonClass.secondary} mt-4`}>
+            {t("catalogue.seeAll")} <span aria-hidden="true">→</span>
+          </Link>
+        </section>
+      ) : null}
     </main>
   );
 }

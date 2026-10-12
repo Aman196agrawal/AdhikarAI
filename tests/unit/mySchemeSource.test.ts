@@ -182,3 +182,27 @@ describe("myScheme source", () => {
     expect(createMySchemeSource().officialUrl("pm-kisan")).toBe("https://www.myscheme.gov.in/schemes/pm-kisan");
   });
 });
+
+describe("myScheme source configuration", () => {
+  it("treats empty environment values as unset", async () => {
+    const saved = { ...process.env };
+    process.env.MYSCHEME_BASE_URL = "";
+    process.env.MYSCHEME_SEARCH_PATH = "";
+    process.env.MYSCHEME_PAGE_SIZE = "";
+    try {
+      const urls: string[] = [];
+      const source = createMySchemeSource({
+        sleep: async () => {},
+        fetch: async (url) => {
+          urls.push(url);
+          return new Response(JSON.stringify(page(["a"], 1, 0)), { status: 200 });
+        },
+      });
+      await source.listAll();
+      expect(urls[0]).toMatch(/^https:\/\/www\.myscheme\.gov\.in\/api\/apisetu\/search\/schemes\?/);
+      expect(new URL(urls[0]).searchParams.get("size")).toBe("10");
+    } finally {
+      process.env = saved;
+    }
+  });
+});

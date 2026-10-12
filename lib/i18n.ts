@@ -104,6 +104,19 @@ const STRINGS = {
     "We cannot yet confirm these reached you. That is not the same as them being lost.",
   "group.notClaimed": "Not yet claimed",
   "group.notClaimedHint": "You appear to qualify but have not claimed these.",
+
+  // --- Scheme catalogue (synced from myScheme) ---------------------------
+  "catalogue.heading": "More schemes you may qualify for",
+  "catalogue.hint":
+    "From the official myScheme list of government schemes, checked against what you have told us. Always confirm on the official page before applying.",
+  "catalogue.possible": "May apply to you",
+  "catalogue.meantFor": "Meant for",
+  "catalogue.toConfirm": "To be sure, check",
+  "catalogue.official": "Official page",
+  "catalogue.source": "Source: myScheme, Government of India. Last updated",
+  "catalogue.notLoaded": "The full list of government schemes has not been loaded yet.",
+  "catalogue.seeAll": "See all schemes you may qualify for",
+  "catalogue.closes": "Applications close",
   "group.allInOrder": "All in order",
   "group.allInOrderHint": "Arriving as they should. We keep watching anyway.",
   "group.doesNotApply": "Does not apply",
@@ -212,6 +225,18 @@ const HINDI: Record<StringKey, string> = {
     "हम अभी पक्का नहीं कह सकते कि ये आप तक पहुँचे। इसका मतलब यह नहीं कि ये गुम हो गए।",
   "group.notClaimed": "अभी तक नहीं लिए",
   "group.notClaimedHint": "लगता है आप पात्र हैं, पर आपने अभी तक आवेदन नहीं किया।",
+
+  "catalogue.heading": "और योजनाएँ, जिनके आप पात्र हो सकते हैं",
+  "catalogue.hint":
+    "यह सरकार की आधिकारिक माईस्कीम सूची से है, और आपने जो बताया उससे मिलाई गई है। आवेदन से पहले आधिकारिक पेज पर ज़रूर देख लें।",
+  "catalogue.possible": "आप पर लागू हो सकती है",
+  "catalogue.meantFor": "किनके लिए",
+  "catalogue.toConfirm": "पक्का करने के लिए देखें",
+  "catalogue.official": "आधिकारिक पेज",
+  "catalogue.source": "स्रोत: माईस्कीम, भारत सरकार। आख़िरी बार अपडेट",
+  "catalogue.notLoaded": "सरकारी योजनाओं की पूरी सूची अभी लोड नहीं हुई है।",
+  "catalogue.seeAll": "वे सभी योजनाएँ देखें जिनके आप पात्र हो सकते हैं",
+  "catalogue.closes": "आवेदन की आख़िरी तारीख़",
   "group.allInOrder": "सब ठीक है",
   "group.allInOrderHint": "जैसे आने चाहिए वैसे आ रहे हैं। फिर भी हम नज़र रखे हुए हैं।",
   "group.doesNotApply": "लागू नहीं",

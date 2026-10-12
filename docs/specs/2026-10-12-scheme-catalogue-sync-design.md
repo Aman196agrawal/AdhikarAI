@@ -1,6 +1,6 @@
 # Scheme catalogue sync — design
 
-**Date:** 2026-10-12 · **Status:** draft for review · **Branch:** `myscheme-sync`
+**Date:** 2026-10-12 · **Status:** implemented on `myscheme-sync` (see Implementation notes) · **Branch:** `myscheme-sync`
 
 ## Goal
 
@@ -40,7 +40,7 @@ material is reproduced accurately and the source is prominently acknowledged.
 Eligibility and benefit amounts are **prose**, not rules. Field names above
 come from an open-source client of the website's API and are **not yet
 confirmed against a live response** — see "Open item" below. All parsing is
-tolerant: unknown fields are kept in the raw snapshot, missing ones become null.
+tolerant: unknown fields are ignored, missing ones become null.
 
 ## Architecture
 
@@ -93,7 +93,7 @@ rule), `draftStatus` (`PENDING` / `DRAFTED` / `FAILED`), `trackedSchemeCode`
 (links to a curated `Scheme.code`, e.g. `PM-KISAN`).
 
 **`CatalogSnapshot`** — immutable history: `catalogSchemeId`, `contentHash`,
-`fetchedAt`, `payload` (raw API response). Unique on (scheme, hash).
+`fetchedAt`, `payload` (the normalised content that was fingerprinted). Unique on (scheme, hash).
 
 **`CatalogRule`** — a drafted or approved rule, in exactly the shape of the
 existing `ClauseSpec` (`kind`, `field`, `op`, `value`, `mandatory`, `text`) so
@@ -190,14 +190,46 @@ fixtures:
 - discovery: POSSIBLE without rules, GREEN only with approved+fresh rules and no unmapped criteria;
 - admin: 404 without `ADMIN_TOKEN`, 401 with a wrong token, approve/reject transitions.
 
-## Open item
+## Implementation notes (2026-10-12)
 
-The field names have not been checked against a live myScheme response. The
-automated tooling here was not permitted to call the API with a key copied
-from a third-party repository. Before the source adapter is finalised, a team
-member captures one search response and one detail response from their own
-browser (myscheme.gov.in → DevTools → Network) and saves them as fixtures; the
-parser is then fitted to those.
+What changed between this design and the code, and why:
+
+- **Endpoint verified.** A search response captured from a team member's
+  browser shows the site now calls `GET www.myscheme.gov.in/api/apisetu/search/schemes`
+  (not `api.myscheme.gov.in/search/v6`). It is saved as
+  `tests/fixtures/myscheme/search-page-0.json` and the search parser is fitted
+  to it: 5,102 schemes, pages of 10.
+- **Facets are derived, not read.** Search hits carry state and level but not
+  gender, caste, BPL and so on; the response only has overall counts. So the
+  source runs one filtered search per restrictive value (about 700 page
+  requests a night) and records which schemes each returns. If a filtered
+  search returns the whole catalogue, the filter was ignored and is skipped.
+  If one fails, the sync keeps the previously stored values for that filter.
+- **Snapshots store the normalised content**, not the raw response: exactly
+  what was fingerprinted, a few KB each, so ~5,100 snapshots stay small enough
+  for the Neon free tier.
+- **Drafting runs as a second step** of the same nightly script
+  (`draftPendingRules`), not inside the sync, and is skipped entirely when no
+  real model is configured: stub drafts must never reach a real review queue.
+- **A rule set counts only when fully reviewed**: no DRAFT left for the current
+  text, and at least one APPROVED. REJECTED rules do not cap the verdict; the
+  reviewer clears or keeps unmapped conditions explicitly.
+
+## Open items
+
+- **Detail endpoint unverified.** The default `/api/apisetu/schemes?slug=&lang=`
+  and its field names are still from the open-source client. Parsing is
+  tolerant and a failed detail never erases stored text, but one detail
+  response should be captured into `tests/fixtures/myscheme/` and the parser
+  fitted to it before the first full run.
+- **Filter query format unverified.** `q=[{"identifier":"gender","value":"Female"}]`
+  is also from the open-source client. The ignored-filter guard makes a wrong
+  format harmless (no facets recorded) but useless; capture one filtered
+  search URL to confirm.
+- **Tracked-scheme links.** Only `igndps → NSAP-IGNDPS` is confirmed; other
+  curated schemes need their myScheme slugs confirmed before linking.
+- **Permission and API Setu.** The email to myScheme and the API Setu
+  application are with the team.
 
 ## Out of scope
 

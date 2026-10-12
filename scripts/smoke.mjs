@@ -137,6 +137,10 @@ async function main() {
     await check("onboarding", "/onboard", en, ["Tell us about yourself"]),
     await check("onboarding (hi)", "/onboard", hi, ["अपने बारे में बताइए"]),
     await check("demo console", "/demo", en, ["Drive the simulation"]),
+    // The catalogue page renders whether or not a sync has run yet.
+    await check("schemes", "/schemes", en, ["More schemes you may qualify for"]),
+    await check("schemes (hi)", "/schemes", hi, ["और योजनाएँ"]),
+    await check("admin catalogue", "/admin/catalogue", null, ["Scheme catalogue review"]),
   ];
 
   if (citizen.entitlement) {

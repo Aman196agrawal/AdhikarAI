@@ -1,0 +1,66 @@
+# Nightly scheme catalogue sync.
+#
+# Reads every scheme myScheme lists (~5,100), detects what changed, and drafts
+# rules for new and changed schemes. At about one request per second a full
+# run takes one to three hours, far beyond a serverless function's limit,
+# which is why it runs here rather than on Vercel.
+#
+# Required repository secrets:
+#   DATABASE_URL       the production database (Neon)
+#   GEMINI_API_KEY     for rule drafting (drafting is skipped without it)
+# Optional:
+#   MYSCHEME_API_KEY   sent as x-api-key if myScheme requires one
+#
+# See docs/specs/2026-10-12-scheme-catalogue-sync-design.md.
+name: scheme-sync
+
+on:
+  schedule:
+    # 21:00 UTC = 02:30 IST, when the site is quietest.
+    - cron: "0 21 * * *"
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Only the first N schemes (blank for all)"
+        required: false
+        default: ""
+
+concurrency:
+  # Two overlapping syncs would race each other through the same rows.
+  group: scheme-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npx prisma generate
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Sync the catalogue
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          MYSCHEME_API_KEY: ${{ secrets.MYSCHEME_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          LLM_PROVIDER: ${{ secrets.GEMINI_API_KEY != '' && 'gemini' || 'stub' }}
+          LIMIT: ${{ github.event.inputs.limit }}
+        run: |
+          ARGS=""
+          if [ -n "$LIMIT" ]; then ARGS="--limit $LIMIT"; fi
+          # Without a model key, sync only: stub drafts must never reach review.
+          if [ "$LLM_PROVIDER" = "stub" ]; then ARGS="$ARGS --no-draft"; fi
+          npm run sync:schemes -- $ARGS

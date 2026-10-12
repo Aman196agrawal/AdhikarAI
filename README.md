@@ -256,6 +256,41 @@ Locally, the demo console runs a pass on demand.
 
 ---
 
+## The scheme catalogue: every scheme, never silently stale
+
+The ten curated schemes above are tracked payment by payment. Beyond them, a
+nightly job syncs **every scheme myScheme lists (about 5,100)** into separate
+catalogue tables, so a citizen also hears about schemes outside the curated ten.
+
+- **Source.** `lib/catalogue/myscheme/source.ts` reads the same JSON the
+  myScheme website reads (`/api/apisetu/search/schemes`), politely: one
+  request at a time, about one a second, with an identifying User-Agent. It
+  sits behind a `SchemeSource` interface, so the official API Setu feed
+  replaces it in one file once access is approved.
+- **Change detection.** Each scheme's normalised content is fingerprinted. A
+  new fingerprint means the scheme changed: a snapshot is kept, and every rule
+  drafted from the old text goes `STALE` at once.
+- **Safe withdrawal.** A scheme is withdrawn only after it is missing from two
+  consecutive full syncs, and never deleted. A listing that shrinks by more
+  than half is treated as a source failure and changes nothing. A scheme whose
+  detail fails to load keeps what we knew, and the run is marked `PARTIAL`.
+- **Rules.** The AI drafts rules from each scheme's eligibility text
+  (`lib/agents/ruleDrafter.ts`). Code rejects any rule with an unknown field,
+  an unsuitable operand, or a quote that is not in the source text, and a
+  rejected rule becomes an *unmapped condition* instead of disappearing.
+  **Only a person can approve a rule**, at `/admin/catalogue`.
+- **What citizens see.** `/schemes`, and the end of the dashboard. Without
+  approved rules a scheme shows as **"May apply to you"**, never "You qualify".
+  "You qualify" needs every drafted rule for the *current* text approved, no
+  unmapped conditions, and nothing left to confirm. Every card links to the
+  official page, and the list states its source and when it was last synced.
+
+Run it with `npm run sync:schemes` (`--limit 20` for a quick partial run). The
+nightly schedule is `.github/workflows/scheme-sync.yml`. Design:
+`docs/specs/2026-10-12-scheme-catalogue-sync-design.md`.
+
+---
+
 ## Environment
 
 | Variable | Purpose |
@@ -266,8 +301,10 @@ Locally, the demo console runs a pass on demand.
 | `GEMINI_API_KEY` | Only needed for `gemini`. |
 | `CRON_SECRET` | Bearer token for the monitoring tick. Unset means refused, never open. |
 | `DEMO_MODE` | `true` exposes the demo console and the simulated clock. Must be `false` anywhere real citizen data lives. |
+| `ADMIN_TOKEN` | Token for the catalogue review screen. Unset means the admin routes return 404. |
+| `MYSCHEME_*` | Optional overrides for the catalogue source (key, base URL, paths, page size). |
 
-No secrets are committed. `.env.example` documents all six.
+No secrets are committed. `.env.example` documents every variable.
 
 ---
 
@@ -291,13 +328,16 @@ against sources during the build: IGNOAPS central assistance is ₹200/month at
 ages 60–79 (not ₹600), and PMMVY requires the beneficiary to be under 55 at
 childbirth.
 
-Before any real use, every clause must be re-verified and the registry replaced
-by an official source (myScheme / API Setu) behind the existing adapter
-interface.
+Before any real use, every clause must be re-verified. The scheme catalogue
+(above) now syncs every myScheme scheme nightly, and flags a curated scheme for
+re-verification when its source text changes.
 
-**No real government API endpoint is invented anywhere in this codebase.** The
-only implementation is a clearly-labelled simulation, every result it returns
-carries `isMock`, and the UI says so wherever those results appear.
+**No government API endpoint is invented anywhere in this codebase.** The
+catalogue reads the endpoint the myScheme website itself uses, observed in a
+browser and recorded in `tests/fixtures/myscheme/`. It is not a published API,
+so access is also being sought through API Setu. Application and payment
+status still come from a clearly-labelled simulation: every result carries
+`isMock`, and the UI says so wherever those results appear.
 
 ---
 

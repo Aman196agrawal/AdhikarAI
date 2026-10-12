@@ -81,9 +81,10 @@ export interface MySchemeSourceOptions extends PoliteHttpOptions {
 
 export function createMySchemeSource(options: MySchemeSourceOptions = {}): SchemeSource {
   const env = process.env;
-  const baseUrl = (options.baseUrl ?? env.MYSCHEME_BASE_URL ?? "https://www.myscheme.gov.in").replace(/\/$/, "");
-  const searchPath = options.searchPath ?? env.MYSCHEME_SEARCH_PATH ?? "/api/apisetu/search/schemes";
-  const detailPath = options.detailPath ?? env.MYSCHEME_DETAIL_PATH ?? "/api/apisetu/schemes";
+  // `||`, not `??`: an empty value in .env means "use the default".
+  const baseUrl = (options.baseUrl || env.MYSCHEME_BASE_URL || "https://www.myscheme.gov.in").replace(/\/$/, "");
+  const searchPath = options.searchPath || env.MYSCHEME_SEARCH_PATH || "/api/apisetu/search/schemes";
+  const detailPath = options.detailPath || env.MYSCHEME_DETAIL_PATH || "/api/apisetu/schemes";
   const pageSize = options.pageSize ?? (Number(env.MYSCHEME_PAGE_SIZE) || 10);
   const apiKey = (options.apiKey ?? env.MYSCHEME_API_KEY ?? "").trim();
 

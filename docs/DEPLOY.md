@@ -97,6 +97,35 @@ curl -i -X POST https://<your-deployment>/api/monitoring/tick
 
 ---
 
+## 3b · The nightly scheme catalogue sync
+
+`.github/workflows/scheme-sync.yml` syncs every myScheme scheme into the
+catalogue at 02:30 IST and drafts rules for new and changed ones. A full run
+takes one to three hours at about one request per second, which is why it runs
+on GitHub Actions rather than Vercel.
+
+Add these repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Value |
+|---|---|
+| `DATABASE_URL` | The same Neon connection string the deployment uses |
+| `GEMINI_API_KEY` | For rule drafting. Without it the sync still runs, with drafting skipped |
+| `MYSCHEME_API_KEY` | Optional; only if myScheme starts requiring one |
+
+Set `ADMIN_TOKEN` in the Vercel project's environment variables so the review
+screen at `/admin/catalogue` works. Without it the admin routes return 404.
+
+The first run: Actions → **scheme-sync** → **Run workflow**, with `limit` set to
+`20`, to check the connection before syncing all ~5,100 schemes. Each run is
+recorded and shown under "Catalogue health" on the review screen.
+
+**Before the first full run**, open one scheme on myscheme.gov.in with DevTools
+open and check the detail request's path. If it is not `/api/apisetu/schemes`,
+set `MYSCHEME_DETAIL_PATH` (see `lib/catalogue/myscheme/source.ts`). The search
+path is verified; the detail path is not yet.
+
+---
+
 ## 4 · Check it works
 
 ```bash
