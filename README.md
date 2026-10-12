@@ -343,6 +343,8 @@ status still come from a clearly-labelled simulation: every result carries
 
 ## Documents
 
+- [`assets/state-graphs/`](assets/state-graphs/) — LangGraph state graphs for every
+  agent flow, with PNG renders
 - [`docs/OVERVIEW.md`](docs/OVERVIEW.md) — the project overview: the problem,
   the benefit lifecycle, and the architecture diagram
 - [`docs/DEMO.md`](docs/DEMO.md) — a six-minute demo script, with the questions
