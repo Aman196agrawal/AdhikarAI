@@ -114,3 +114,34 @@ export function requireCronSecret(request: Request): void {
     throw new ApiError("UNAUTHORIZED", "Invalid or missing cron credentials.");
   }
 }
+
+/**
+ * Guard the catalogue review routes with a shared admin token.
+ *
+ * A stopgap until real authentication exists, and deliberately unforgiving:
+ * with no ADMIN_TOKEN configured the routes report NOT_FOUND, so a deployment
+ * that never set one does not even advertise that they exist. The token is
+ * sent as `Authorization: Bearer <token>` or `x-admin-token`, and the
+ * reviewer's name as `x-reviewer`, which is recorded on every decision.
+ */
+export function requireAdmin(request: Request): { reviewer: string } {
+  const expected = (process.env.ADMIN_TOKEN ?? "").trim();
+  if (expected === "") {
+    throw new ApiError("NOT_FOUND", "Not found.");
+  }
+
+  const bearer = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+  const provided = bearer || (request.headers.get("x-admin-token") ?? "").trim();
+
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (provided === "" || a.length !== b.length || !timingSafeEqual(a, b)) {
+    throw new ApiError("UNAUTHORIZED", "Invalid or missing admin credentials.");
+  }
+
+  const reviewer = (request.headers.get("x-reviewer") ?? "").trim();
+  if (reviewer === "") {
+    throw new ApiError("BAD_REQUEST", "Say who is reviewing, in the x-reviewer header.");
+  }
+  return { reviewer: reviewer.slice(0, 80) };
+}

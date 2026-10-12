@@ -409,3 +409,39 @@ registerStubFixture("plan.correctiveAction", (request) => {
     evidenceNeeded: ["A response from the department"],
   };
 });
+
+/**
+ * Catalogue rule drafting. Recognises a handful of common eligibility phrases
+ * and quotes the sentence each came from, exactly as a well-behaved model
+ * must; every other sentence is reported as unmapped. Enough to drive the
+ * draft -> review -> match flow end to end with no model.
+ */
+registerStubFixture("catalogue.draftRules", (request) => {
+  const fenced = /<<<SCHEME_TEXT([\s\S]*?)SCHEME_TEXT>>>/.exec(request.prompt);
+  const sentences = (fenced?.[1] ?? "")
+    .split(/(?<=[.;])\s+|\n+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 8);
+
+  const rules: Array<Record<string, unknown>> = [];
+  const unmapped: string[] = [];
+
+  for (const sentence of sentences) {
+    const lower = sentence.toLowerCase();
+    const age = /(\d{2})\s*years?\s*(?:of age\s*)?(?:and|or)\s*(?:above|older|more)/.exec(lower);
+
+    if (age) {
+      rules.push({ code: `AGE_${age[1]}_PLUS`, kind: "ELIGIBILITY", field: "age", op: "gte", value: Number(age[1]), mandatory: true, text: `Applicant must be at least ${age[1]} years old.`, sourceQuote: sentence });
+    } else if (/\bwidow/.test(lower)) {
+      rules.push({ code: "IS_WIDOW", kind: "ELIGIBILITY", field: "isWidow", op: "is_true", value: null, mandatory: true, text: "Applicant must be a widow.", sourceQuote: sentence });
+    } else if (/below poverty line|\bbpl\b/.test(lower)) {
+      rules.push({ code: "HAS_BPL_CARD", kind: "ELIGIBILITY", field: "hasBplCard", op: "is_true", value: null, mandatory: true, text: "Applicant's household must be below the poverty line.", sourceQuote: sentence });
+    } else if (/income tax/.test(lower)) {
+      rules.push({ code: "INCOME_TAX_PAYER", kind: "EXCLUSION", field: "isIncomeTaxPayer", op: "is_true", value: null, mandatory: true, text: "Income tax payers are not eligible.", sourceQuote: sentence });
+    } else {
+      unmapped.push(sentence);
+    }
+  }
+
+  return { rules, unmapped };
+});

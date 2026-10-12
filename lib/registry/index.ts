@@ -83,6 +83,22 @@ function validateClause(
     );
   }
 
+  for (const problem of clauseShapeProblems(clause)) {
+    problems.push(`${where}: ${problem}`);
+  }
+}
+
+/**
+ * Structural problems with a clause's operator, operand and kind.
+ *
+ * Shared by the registry check and by the catalogue rule drafter, so a rule an
+ * AI drafted has to meet exactly the standard a hand-written one does.
+ */
+export function clauseShapeProblems(
+  clause: Pick<ClauseSpec, "kind" | "op" | "value">,
+): string[] {
+  const problems: string[] = [];
+
   if (RANGE_OPS.has(clause.op)) {
     const v = clause.value;
     const ok =
@@ -92,18 +108,18 @@ function validateClause(
       (v as number[])[0] <= (v as number[])[1];
     if (!ok) {
       problems.push(
-        `${where}: "${clause.op}" needs an ascending two-number tuple, got ${JSON.stringify(v)}`,
+        `"${clause.op}" needs an ascending two-number tuple, got ${JSON.stringify(v)}`,
       );
     }
   } else if (LIST_OPS.has(clause.op)) {
     if (!Array.isArray(clause.value) || clause.value.length === 0) {
       problems.push(
-        `${where}: "${clause.op}" needs a non-empty array, got ${JSON.stringify(clause.value)}`,
+        `"${clause.op}" needs a non-empty array, got ${JSON.stringify(clause.value)}`,
       );
     }
   } else if (!NULLARY_OPS.has(clause.op)) {
     if (clause.value === null || clause.value === undefined) {
-      problems.push(`${where}: "${clause.op}" needs a value`);
+      problems.push(`"${clause.op}" needs a value`);
     }
   }
 
@@ -112,9 +128,11 @@ function validateClause(
   // silently flip a RED verdict to GREEN.
   if (clause.kind === "EXCLUSION" && (clause.op === "neq" || clause.op === "not_in")) {
     problems.push(
-      `${where}: EXCLUSION clauses must state the disqualifying condition positively, not with "${clause.op}"`,
+      `EXCLUSION clauses must state the disqualifying condition positively, not with "${clause.op}"`,
     );
   }
+
+  return problems;
 }
 
 /**
