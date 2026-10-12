@@ -1,0 +1,581 @@
+{
+  "data": {
+    "facets": [
+      {
+        "display": "ComboBoxFacet",
+        "entries": [
+          { "count": 725, "label": "All" },
+          { "count": 643, "label": "Gujarat" },
+          { "count": 447, "label": "Uttarakhand" },
+          { "count": 333, "label": "Rajasthan" },
+          { "count": 309, "label": "Madhya Pradesh" },
+          { "count": 288, "label": "Goa" },
+          { "count": 271, "label": "Puducherry" },
+          { "count": 249, "label": "Haryana" },
+          { "count": 240, "label": "Tamil Nadu" },
+          { "count": 120, "label": "Chhattisgarh" },
+          { "count": 114, "label": "Bihar" },
+          { "count": 113, "label": "West Bengal" },
+          { "count": 105, "label": "Odisha" },
+          { "count": 97, "label": "Himachal Pradesh" },
+          { "count": 97, "label": "Jharkhand" },
+          { "count": 93, "label": "Meghalaya" },
+          { "count": 87, "label": "Assam" },
+          { "count": 87, "label": "Kerala" },
+          { "count": 85, "label": "Maharashtra" },
+          { "count": 62, "label": "Dadra & Nagar Haveli and Daman & Diu" },
+          { "count": 60, "label": "Karnataka" },
+          { "count": 55, "label": "Delhi" },
+          { "count": 53, "label": "Andhra Pradesh" },
+          { "count": 50, "label": "Arunachal Pradesh" },
+          { "count": 48, "label": "Uttar Pradesh" },
+          { "count": 46, "label": "Jammu and Kashmir" },
+          { "count": 44, "label": "Tripura" },
+          { "count": 41, "label": "Punjab" },
+          { "count": 40, "label": "Mizoram" },
+          { "count": 34, "label": "Manipur" },
+          { "count": 29, "label": "Sikkim" },
+          { "count": 28, "label": "Nagaland" },
+          { "count": 23, "label": "Telangana" },
+          { "count": 21, "label": "Chandigarh" },
+          { "count": 19, "label": "Andaman and Nicobar Islands" },
+          { "count": 12, "label": "Ladakh" }
+        ],
+        "identifier": "beneficiaryState",
+        "label": "State",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 1519, "label": "Social welfare & Empowerment" },
+          { "count": 1178, "label": "Education & Learning" },
+          { "count": 931, "label": "Agriculture,Rural & Environment" },
+          { "count": 829, "label": "Business & Entrepreneurship" },
+          { "count": 482, "label": "Women and Child" },
+          { "count": 407, "label": "Skills & Employment" },
+          { "count": 358, "label": "Banking,Financial Services and Insurance" },
+          { "count": 307, "label": "Sports & Culture" },
+          { "count": 295, "label": "Health & Wellness" },
+          { "count": 145, "label": "Housing & Shelter" },
+          { "count": 144, "label": "Transport & Infrastructure" },
+          { "count": 134, "label": "Science, IT & Communications" },
+          { "count": 104, "label": "Travel & Tourism" },
+          { "count": 60, "label": "Utility & Sanitation" },
+          { "count": 35, "label": "Public Safety,Law & Justice" }
+        ],
+        "identifier": "schemeCategory",
+        "label": "Scheme Category",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 4234, "label": "All" },
+          { "count": 827, "label": "Female" },
+          { "count": 357, "label": "Male" },
+          { "count": 32, "label": "Transgender" }
+        ],
+        "identifier": "gender",
+        "label": "Gender",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ComboBoxFacet",
+        "entries": [
+          { "count": 717, "label": 0 },
+          { "count": 4115, "label": 10 },
+          { "count": 4128, "label": 20 },
+          { "count": 4022, "label": 30 },
+          { "count": 3847, "label": 40 },
+          { "count": 3574, "label": 50 },
+          { "count": 3315, "label": 60 },
+          { "count": 2169, "label": 70 },
+          { "count": 2082, "label": 80 },
+          { "count": 2029, "label": 90 },
+          { "count": 1911, "label": 100 },
+          { "count": 1, "label": 110 }
+        ],
+        "identifier": "age-general",
+        "label": "Age",
+        "type": "RangeFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 4263, "label": "All" },
+          { "count": 411, "label": "Scheduled Caste (SC)" },
+          { "count": 392, "label": "Scheduled Tribe (ST)" },
+          { "count": 201, "label": "Other Backward Class (OBC)" },
+          { "count": 76, "label": "General" },
+          { "count": 41, "label": "Particularly Vulnerable Tribal Group (PVTG)" },
+          { "count": 14, "label": "De-Notified, Nomadic, and Semi-Nomadic (DNT) communities" }
+        ],
+        "identifier": "caste",
+        "label": "Caste",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ComboBoxFacet",
+        "entries": [
+          { "count": 85, "label": "Ministry Of Social Justice and Empowerment" },
+          { "count": 85, "label": "Ministry of Education" },
+          { "count": 71, "label": "Ministry Of Science And Technology" },
+          { "count": 67, "label": "Ministry Of Commerce And Industry" },
+          { "count": 45, "label": "Ministry Of Agriculture and Farmers Welfare" },
+          { "count": 31, "label": "Ministry Of Micro, Small and Medium Enterprises" },
+          { "count": 25, "label": "Ministry Of Culture" },
+          { "count": 24, "label": "Ministry Of Textiles" },
+          { "count": 24, "label": "Ministry of Electronics and Information Technology" },
+          { "count": 22, "label": "Ministry Of Youth Affairs & Sports" },
+          { "count": 19, "label": "Ministry Of Finance" },
+          { "count": 18, "label": "Ministry Of Home Affairs" },
+          { "count": 15, "label": "Ministry Of Defence" },
+          { "count": 15, "label": "Ministry Of Health & Family Welfare" },
+          { "count": 14, "label": "Ministry of Fisheries,Animal Husbandry and Dairying" },
+          { "count": 13, "label": "Ministry Of Labour and Employment" },
+          { "count": 12, "label": "Ministry Of Minority Affairs" },
+          { "count": 11, "label": "Ministry Of Communication" },
+          { "count": 11, "label": "Ministry Of Skill Development And Entrepreneurship" },
+          { "count": 10, "label": "Ministry Of Ayush" },
+          { "count": 10, "label": "Ministry Of Chemicals And Fertilizers" },
+          { "count": 10, "label": "Ministry Of Rural Development" },
+          { "count": 10, "label": "Ministry Of Tribal Affairs" },
+          { "count": 7, "label": "Ministry Of New and Renewable Energy" },
+          { "count": 7, "label": "Ministry Of Tourism" },
+          { "count": 7, "label": "Ministry of Women and Child Development" },
+          { "count": 6, "label": "Ministry Of Jal Shakti" },
+          { "count": 5, "label": "Ministry Of External Affairs" },
+          { "count": 5, "label": "Ministry Of Housing & Urban Affairs" },
+          { "count": 5, "label": "Ministry Of Law and Justice" },
+          { "count": 5, "label": "Ministry Of Personnel, Public Grievances And Pensions" },
+          { "count": 5, "label": "Ministry of Ports,Shipping and Waterways" },
+          { "count": 4, "label": "Ministry Of Environment,forests and climate change" },
+          { "count": 4, "label": "Ministry Of Steel" },
+          { "count": 4, "label": "Ministry of Heavy Industries" },
+          { "count": 4, "label": "PMO" },
+          { "count": 3, "label": "Ministry Of Petroleum and Natural Gas" },
+          { "count": 3, "label": "Ministry Of Statistics and Programme Implementation" },
+          { "count": 3, "label": "Ministry of Corporate Affairs" },
+          { "count": 3, "label": "Ministry of Food Processing Industries" },
+          { "count": 2, "label": "Comptroller And Auditor General Of India" },
+          { "count": 2, "label": "Ministry Of Consumer Affairs, Food And Public Distribution" },
+          { "count": 2, "label": "Ministry Of Panchayati Raj" },
+          { "count": 2, "label": "Ministry Of Road Transport & Highways" },
+          { "count": 2, "label": "Ministry Of Water Resources,River Development & Ganga Rejuvenation" },
+          { "count": 2, "label": "The Lokpal of India" },
+          { "count": 1, "label": "Ministry Of Development Of North Eastern Region" },
+          { "count": 1, "label": "Ministry Of Earth Sciences" },
+          { "count": 1, "label": "Ministry Of Information And Broadcasting" },
+          { "count": 1, "label": "Ministry Of Mines" },
+          { "count": 1, "label": "Ministry Of Power" },
+          { "count": 1, "label": "Ministry Of Railways" },
+          { "count": 1, "label": "NITI Aayog (National Institution for Transforming India)" }
+        ],
+        "identifier": "nodalMinistryName",
+        "label": "Ministry Name",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 4356, "label": "State" },
+          { "count": 746, "label": "Central" }
+        ],
+        "identifier": "level",
+        "label": "Level",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 4855, "label": "Both" },
+          { "count": 215, "label": "Rural" },
+          { "count": 42, "label": "Urban" }
+        ],
+        "identifier": "residence",
+        "label": "Residence",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "SingleCheckBoxFacet",
+        "entries": [
+          { "count": 5027, "label": "No" },
+          { "count": 75, "label": "Yes" }
+        ],
+        "identifier": "minority",
+        "label": "Minority",
+        "type": "CustomFacet"
+      },
+      {
+        "display": "SingleCheckBoxFacet",
+        "entries": [
+          { "count": 4785, "label": "No" },
+          { "count": 317, "label": "Yes" }
+        ],
+        "identifier": "disability",
+        "label": "Differently Abled",
+        "type": "CustomFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 3535, "label": "Cash" },
+          { "count": 895, "label": "In Kind" },
+          { "count": 672, "label": "Composite" }
+        ],
+        "identifier": "benefitTypes",
+        "label": "Benefit Type",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "SingleCheckBoxFacet",
+        "entries": [
+          { "count": 4579, "label": "No" },
+          { "count": 523, "label": "Yes" }
+        ],
+        "identifier": "dbtScheme",
+        "label": "DBT Scheme",
+        "type": "CustomFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 4792, "label": "All" },
+          { "count": 143, "label": "Never Married" },
+          { "count": 112, "label": "Widowed" },
+          { "count": 93, "label": "Married" },
+          { "count": 48, "label": "Divorced" },
+          { "count": 47, "label": "Separated" }
+        ],
+        "identifier": "maritalStatus",
+        "label": "Marital Status",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ComboBoxFacet",
+        "entries": [
+          { "count": 24, "label": 0 },
+          { "count": 28, "label": 10 },
+          { "count": 33, "label": 20 },
+          { "count": 33, "label": 30 },
+          { "count": 185, "label": 40 },
+          { "count": 189, "label": 50 },
+          { "count": 195, "label": 60 },
+          { "count": 200, "label": 70 },
+          { "count": 213, "label": 80 },
+          { "count": 213, "label": 90 },
+          { "count": 222, "label": 100 }
+        ],
+        "identifier": "disabilityPercentage",
+        "label": "Disability Percentage",
+        "type": "RangeFacet"
+      },
+      {
+        "display": "SingleCheckBoxFacet",
+        "entries": [
+          { "count": 4915, "label": "No" },
+          { "count": 187, "label": "Yes" }
+        ],
+        "identifier": "isBpl",
+        "label": "Below Poverty Line",
+        "type": "CustomFacet"
+      },
+      {
+        "display": "SingleCheckBoxFacet",
+        "entries": [
+          { "count": 5055, "label": "No" },
+          { "count": 47, "label": "Yes" }
+        ],
+        "identifier": "isEconomicDistress",
+        "label": "Economic Distress",
+        "type": "CustomFacet"
+      },
+      {
+        "display": "SingleCheckBoxFacet",
+        "entries": [
+          { "count": 5085, "label": "No" },
+          { "count": 17, "label": "Yes" }
+        ],
+        "identifier": "isGovEmployee",
+        "label": "Government Employee",
+        "type": "CustomFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 3915, "label": "All" },
+          { "count": 568, "label": "Employed" },
+          { "count": 446, "label": "Self-Employed/ Entrepreneur" },
+          { "count": 173, "label": "Unemployed" }
+        ],
+        "identifier": "employmentStatus",
+        "label": "Employment Status",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "SingleCheckBoxFacet",
+        "entries": [
+          { "count": 4717, "label": "No" },
+          { "count": 385, "label": "Yes" }
+        ],
+        "identifier": "isStudent",
+        "label": "Student",
+        "type": "CustomFacet"
+      },
+      {
+        "display": "ComboBoxFacet",
+        "entries": [
+          { "count": 421, "label": "All" },
+          { "count": 383, "label": "Farmer" },
+          { "count": 284, "label": "Construction Worker" },
+          { "count": 194, "label": "Unorganized Worker" },
+          { "count": 115, "label": "Fishermen" },
+          { "count": 89, "label": "Artists" },
+          { "count": 82, "label": "Artisans, Spinners & Weavers" },
+          { "count": 65, "label": "Student" },
+          { "count": 40, "label": "Organized Worker" },
+          { "count": 37, "label": "Sportsperson" },
+          { "count": 30, "label": "Ex Servicemen" },
+          { "count": 25, "label": "Journalist" },
+          { "count": 21, "label": "Dairy Farmer" },
+          { "count": 19, "label": "Safai Karamchari" },
+          { "count": 15, "label": "Teacher / Faculty" },
+          { "count": 7, "label": "Coir Worker" },
+          { "count": 3, "label": "Street Vendor" },
+          { "count": 2, "label": "Health Worker" },
+          { "count": 2, "label": "Khadi Artisan" },
+          { "count": 2, "label": "Lawyer / Law Graduate / Advocate" }
+        ],
+        "identifier": "occupation",
+        "label": "Occupation",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 2919, "label": "Offline" },
+          { "count": 2482, "label": "Online" },
+          { "count": 223, "label": "Online - via CSC" }
+        ],
+        "identifier": "applicationMode",
+        "label": "Application Mode",
+        "type": "RefinementSelectFacet"
+      },
+      {
+        "display": "ListFacet",
+        "entries": [
+          { "count": 557, "label": "Central Sector Scheme" },
+          { "count": 164, "label": "Centrally Sponsored Scheme" }
+        ],
+        "identifier": "schemeType",
+        "label": "Scheme Type",
+        "type": "RefinementSelectFacet"
+      }
+    ],
+    "hits": {
+      "items": [
+        {
+          "fields": {
+            "beneficiaryState": ["All"],
+            "briefDescription": "Under this scheme, DOPT proposes to offer four short-term fellowships to researchers from the field of media / Civil Society professionals / RTI Trainers to conduct field-based research on themes relating to RTI. It is hoped that the research output will enhance their understanding of the RTI Act.",
+            "level": "Central",
+            "nodalMinistryName": "Ministry Of Personnel, Public Grievances And Pensions",
+            "priority": 1,
+            "schemeCategory": ["Education & Learning"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Right To Information Fellowship",
+            "schemeShortTitle": "RTIF",
+            "slug": "rtif",
+            "tags": ["Internship", "Student", "RTI", "Journalism", "Communication"]
+          },
+          "highlight": {},
+          "id": "thg0IZ4B5uF80_MGlmo1"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["All"],
+            "briefDescription": "The “National Post Doctoral Fellowship (N-PDF)” was launched by the Science and Engineering Research Board, Government of India to identify motivated young researchers and provide them support for doing research in frontier areas of science and engineering.",
+            "level": "Central",
+            "nodalMinistryName": "Ministry Of Science And Technology",
+            "priority": 1,
+            "schemeCategory": ["Science, IT & Communications"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "National Post Doctoral Fellowship",
+            "schemeShortTitle": "N-PDF",
+            "slug": "n-pdf",
+            "tags": ["National", "Post Doctoral", "Fellowship", "Science", "Research", "Fellow"]
+          },
+          "highlight": {},
+          "id": "TMcMHJ4B0AGc0F0imBBj"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["All"],
+            "briefDescription": "The scheme aims to promote organic fertilizers produced at Bio-Gas and Compressed Bio-Gas plants under the Galvanizing Organic Bio-Agro Resources Dhan initiative. It provides Market Development Assistance of ₹1,500/- per Metric Tonne to manufacturing and marketing entities of organic fertilizers.",
+            "level": "Central",
+            "nodalMinistryName": "Ministry Of Chemicals And Fertilizers",
+            "priority": 1,
+            "schemeCategory": ["Business & Entrepreneurship", "Science, IT & Communications"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Market Development Assistance",
+            "schemeShortTitle": "MDA-FERT",
+            "slug": "mda-fert",
+            "tags": ["Manufacturer", "Operator", "Institute", "Subsidy", "Fertilizer"]
+          },
+          "highlight": {},
+          "id": "LqKpG54BXu-iUKXq61Sa"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["All"],
+            "briefDescription": "The scheme aims to provide social security pensions to divyangjans aged 18 and above who belong to a poor family (BPL) in society.\n\n",
+            "level": "Central",
+            "nodalMinistryName": "Ministry Of Rural Development",
+            "priority": 1,
+            "schemeCategory": ["Social welfare & Empowerment"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Indira Gandhi National Disability Pension Scheme",
+            "schemeShortTitle": "IGNDPS",
+            "slug": "igndps",
+            "tags": ["Differently Abled", "Pension", "Below Poverty Line - BPL"]
+          },
+          "highlight": {},
+          "id": "jxgdIJ4B5uF80_MGOmpz"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["Dadra & Nagar Haveli and Daman & Diu"],
+            "briefDescription": "The scheme is implemented by the Social Welfare Department, aims to provide financial assistance to widows aged between 18-59 years. The scheme offers ₹1,000/- per month to help meet their basic needs, ensuring public assistance for widows in need of support to maintain a dignified life.",
+            "level": "State",
+            "priority": 1,
+            "schemeCategory": ["Social welfare & Empowerment"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Pension Scheme to Widow- DNH & DD",
+            "schemeShortTitle": "PSW",
+            "slug": "psw",
+            "tags": ["Widow"]
+          },
+          "highlight": {},
+          "id": "nKJyCJ4BXu-iUKXqjlPl"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["All"],
+            "briefDescription": "PM VIKAS is a Central sector scheme that focuses on socio-economic empowerment of six notified minorities in the country through skilling & training, women leadership & empowerment and education. The scheme integrates erstwhile skilling & education schemes of the Ministry of Minority Affairs.",
+            "level": "Central",
+            "nodalMinistryName": "Ministry Of Minority Affairs",
+            "priority": 1,
+            "schemeCategory": ["Skills & Employment", "Social welfare & Empowerment", "Education & Learning", "Business & Entrepreneurship"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Pradhan Mantri Virasat ka Samvardhan",
+            "schemeShortTitle": "PM VIKAS",
+            "slug": "pm-vikas",
+            "tags": ["Skill Development", "Women Entrepeneurship", "Education Of School Dropouts", "Socio-economic Empowerment", "Minorities"]
+          },
+          "highlight": {},
+          "id": "S6IT_Z0BXu-iUKXqRVNs"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["All"],
+            "briefDescription": "A welfare scheme by the Department of Military Affairs, MoD under which rigorous military training will be imparted to the youth aged between 17.5 to 23 years and meeting other educational, physical, and medical criteria, who are aspirational to be a part of the armed forces.",
+            "level": "Central",
+            "nodalMinistryName": "Ministry Of Defence",
+            "priority": 1,
+            "schemeCategory": ["Skills & Employment"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Agnipath Yojana",
+            "schemeShortTitle": "AY",
+            "slug": "ay",
+            "tags": ["Youth", "Armed Forces", "Military", "Agniveer", "Employment", "Indian Navy", "Indian Air Force", "Indian Army"]
+          },
+          "highlight": {},
+          "id": "7BgR950B5uF80_MGpmin"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["Assam"],
+            "briefDescription": "The scheme aims to provide financial grants to meritorious ST (P)/OBC/MOBC students in Assam who secure high marks in Matriculation, 10+2, Graduation, or Post Graduation. Benefits include fixed monetary assistance ranging from ₹10,000/- to ₹25,000/- based on educational level.",
+            "level": "State",
+            "priority": 1,
+            "schemeCategory": ["Education & Learning"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Special Incentive to ST (P)/OBC/MOBC Meritorious Students",
+            "schemeShortTitle": "SISTPOMMS",
+            "slug": "sistpomms",
+            "tags": ["Incentive", "Student", "School", "Education", "Scheduled Tribe", "Other Backward Class", "Merit"]
+          },
+          "highlight": {},
+          "id": "raIFuZ0BXu-iUKXqxVFN"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["Tamil Nadu"],
+            "briefDescription": "The scheme offers loans to farmers covering up to 90% of the cost of a power tiller, with an interest rate between 11% and 12.25%.\n\n",
+            "level": "State",
+            "priority": 1,
+            "schemeCategory": ["Banking,Financial Services and Insurance"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Primary Cooperative Agriculture and Rural Development Bank: For Power Tiller",
+            "schemeShortTitle": "PCARDBPT",
+            "slug": "pcardbpt",
+            "tags": ["Power Tiller", "Loan", "Farmer", "Agriculture And Rural Development Bank", "Farming Equipment"]
+          },
+          "highlight": {},
+          "id": "p8czlZ0B0AGc0F0ikwx0"
+        },
+        {
+          "fields": {
+            "beneficiaryState": ["All"],
+            "briefDescription": "This scheme promotes cultural activities across states and fosters unity while providing opportunities for creative expression and learning, especially for the youth.",
+            "level": "Central",
+            "nodalMinistryName": "Ministry Of Culture",
+            "priority": 1,
+            "schemeCategory": ["Sports & Culture"],
+            "schemeCloseDate": null,
+            "schemeFor": "Individual",
+            "schemeName": "Financial Assistance for Tagore Cultural Complexes (TCC)",
+            "schemeShortTitle": "FAFTCC",
+            "slug": "faftcc",
+            "tags": ["Tagore", "Music", "Dance", "Art And Culture"]
+          },
+          "highlight": {},
+          "id": "TKJtrp0BXu-iUKXqq1G_"
+        }
+      ],
+      "page": {
+        "from": 0,
+        "pageNumber": 0,
+        "size": 10,
+        "total": 5102,
+        "totalPages": 511
+      }
+    },
+    "sortedBy": "multiple_sort",
+    "summary": {
+      "appliedFilters": [],
+      "disabledFilters": [],
+      "query": "",
+      "sortOptions": [
+        { "id": "multiple_sort", "label": "Relevance" },
+        { "id": "schemename-asc", "label": "Scheme Name (A->Z)" },
+        { "id": "schemename-desc", "label": "Scheme Name (Z->A)" }
+      ],
+      "total": 5102
+    }
+  },
+  "error": "null",
+  "errorDescription": "",
+  "status": "Success",
+  "statusCode": 200
+}

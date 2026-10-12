@@ -281,7 +281,9 @@ function describeMissingEvidence(evaluation: ClauseEvaluation): string {
  * plainly excluded from wastes their time and their trust.
  */
 export function evaluateScheme(
-  scheme: SchemeSpec,
+  // Only the code and clauses are read, so a catalogue scheme with approved
+  // rules is evaluated by exactly the same logic as a curated one.
+  scheme: Pick<SchemeSpec, "code" | "clauses">,
   profile: Profile,
 ): SchemeEvaluation {
   const clauses = scheme.clauses.map((c) => evaluateClause(c, profile));

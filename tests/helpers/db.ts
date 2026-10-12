@@ -117,3 +117,9 @@ export async function createCitizen(
 export async function disconnect(): Promise<void> {
   await prisma.$disconnect();
 }
+
+/** Empty the scheme catalogue and its sync history. */
+export async function resetCatalogue(): Promise<void> {
+  await prisma.catalogScheme.deleteMany({});
+  await prisma.schemeSyncRun.deleteMany({});
+}

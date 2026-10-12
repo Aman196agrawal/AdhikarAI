@@ -845,7 +845,7 @@ model Approval {
   applicationId String?
   actionPlanId  String?
 
-  decision  ApprovalDecision @default(PENDING)
+  decision ApprovalDecision @default(PENDING)
 
   /// e.g. "citizen:<id>".
   decidedBy String?
@@ -1071,4 +1071,175 @@ model DemoPersona {
   position  Int     @default(0)
 
   citizen Citizen? @relation(fields: [citizenId], references: [id], onDelete: SetNull)
+}
+
+// ---------------------------------------------------------------------------
+// Scheme catalogue (synced from an external source such as myScheme)
+// ---------------------------------------------------------------------------
+//
+// Kept apart from Scheme on purpose. Scheme carries what a payment-by-payment
+// continuity audit needs (frequency, instalment amount, form schema); filling
+// those with placeholders for thousands of catalogue entries would corrupt the
+// audit. A catalogue entry can point at a tracked scheme by code instead.
+// See docs/specs/2026-10-12-scheme-catalogue-sync-design.md.
+
+enum CatalogStatus {
+  ACTIVE
+  WITHDRAWN
+}
+
+enum CatalogDraftStatus {
+  PENDING
+  DRAFTED
+  FAILED
+}
+
+enum CatalogRuleStatus {
+  DRAFT
+  APPROVED
+  REJECTED
+  STALE
+}
+
+enum SyncRunStatus {
+  RUNNING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+}
+
+model CatalogScheme {
+  id String @id @default(cuid())
+
+  /// Which source this came from, e.g. "myscheme".
+  source     String
+  /// The source's own identifier (the myScheme slug).
+  externalId String
+
+  name       String
+  nameHi     String?
+  shortTitle String?
+
+  /// "Central" or "State", as the source reports it.
+  level      String
+  /// Empty means applicable across India.
+  states     String[]
+  categories String[]
+  ministry   String?
+  tags       String[]
+  schemeFor  String?
+  closesOn   DateTime?
+
+  briefDescription     String
+  eligibilityMd        String?
+  benefitsMd           String?
+  exclusionsMd         String?
+  documentsMd          String?
+  applicationProcessMd String?
+  /// The same texts in Hindi, when the source has them.
+  hindi                Json?
+
+  /// Restrictive filter values per identifier, e.g. {"gender": ["Female"]}.
+  /// An identifier that is absent means the scheme does not restrict on it.
+  facets Json @default("{}")
+
+  officialUrl   String
+  referenceUrls String[]
+
+  /// sha256 of the normalised content. A change here is a change in the scheme.
+  contentHash String
+  status      CatalogStatus @default(ACTIVE)
+
+  firstSeenAt      DateTime
+  lastFetchedAt    DateTime
+  lastChangedAt    DateTime
+  withdrawnAt      DateTime?
+  /// Consecutive successful syncs that did not list this scheme.
+  missingSyncCount Int       @default(0)
+
+  /// Eligibility conditions the rule drafter could not express as a rule.
+  unmappedCriteria String[]
+  draftStatus      CatalogDraftStatus @default(PENDING)
+
+  /// Links to a curated, payment-tracked Scheme.code, when one exists.
+  trackedSchemeCode String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  snapshots CatalogSnapshot[]
+  rules     CatalogRule[]
+
+  @@unique([source, externalId])
+  @@index([status, level])
+  @@index([draftStatus])
+}
+
+/// Immutable history of what the source said, one row per distinct version.
+model CatalogSnapshot {
+  id              String   @id @default(cuid())
+  catalogSchemeId String
+  contentHash     String
+  fetchedAt       DateTime
+  payload         Json
+
+  scheme CatalogScheme @relation(fields: [catalogSchemeId], references: [id], onDelete: Cascade)
+
+  @@unique([catalogSchemeId, contentHash])
+}
+
+/// A rule in exactly the shape of a registry ClauseSpec, so the existing
+/// engine evaluates it unchanged. Usable only while APPROVED and drafted from
+/// the scheme's current content (sourceHash == CatalogScheme.contentHash).
+model CatalogRule {
+  id              String @id @default(cuid())
+  catalogSchemeId String
+
+  code      String
+  kind      ClauseKind
+  field     String
+  op        String
+  value     Json
+  mandatory Boolean    @default(true)
+  text      String
+
+  /// The sentence of the source text this rule was drawn from.
+  sourceQuote String
+  /// contentHash of the scheme version this rule was drafted from.
+  sourceHash  String
+
+  status     CatalogRuleStatus @default(DRAFT)
+  /// "ai" or "human".
+  draftedBy  String
+  reviewedBy String?
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  scheme CatalogScheme @relation(fields: [catalogSchemeId], references: [id], onDelete: Cascade)
+
+  @@unique([catalogSchemeId, code])
+  @@index([status])
+}
+
+model SchemeSyncRun {
+  id     String        @id @default(cuid())
+  source String
+  status SyncRunStatus @default(RUNNING)
+
+  startedAt  DateTime
+  finishedAt DateTime?
+
+  listed    Int @default(0)
+  created   Int @default(0)
+  changed   Int @default(0)
+  unchanged Int @default(0)
+  withdrawn Int @default(0)
+  failed    Int @default(0)
+  drafted   Int @default(0)
+
+  /// Per-scheme failures and the reason a run was not SUCCEEDED; capped.
+  errors Json    @default("[]")
+  note   String?
 }
